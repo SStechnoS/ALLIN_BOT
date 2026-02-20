@@ -1,0 +1,71 @@
+[
+  {
+    "id": "ff150954-98ce-43b7-b205-75b036ac5e28",
+    "type": "remind24h",
+    "data": {
+      "leadId": "a685ab80-d546-4cb2-89c0-a67c6dce49d9",
+      "tgId": 7084177402,
+      "lessonDate": "2026-02-24",
+      "lessonTime": "11:30",
+      "lessonDatetime": "2026-02-24T11:30:00+02:00",
+      "zoomLink": "https://us06web.zoom.us/j/84579310670?pwd=JhI2aItqBaXRb9aMEEZOn7nabP7foi.1",
+      "name": ""
+    },
+    "runAt": 1771839000001,
+    "attempts": 0
+  },
+  {
+    "id": "a07e2f12-ba25-424d-82ba-a759a56284e8",
+    "type": "remind24h",
+    "data": {
+      "leadId": "a685ab80-d546-4cb2-89c0-a67c6dce49d9",
+      "tgId": 7084177402,
+      "lessonDate": "2026-02-24",
+      "lessonTime": "07:00",
+      "lessonDatetime": "2026-02-24T07:00:00+02:00",
+      "zoomLink": "https://us06web.zoom.us/j/81545506816?pwd=OHjTLx2v6msXgvB8hLxo07ndKzfAtT.1",
+      "name": ""
+    },
+    "runAt": 1771822800000,
+    "attempts": 0
+  },
+  {
+    "id": "8f3886c9-424f-48d2-98f4-7df27a1bc3f4",
+    "type": "remind24h",
+    "data": {
+      "leadId": "a685ab80-d546-4cb2-89c0-a67c6dce49d9",
+      "tgId": 7084177402,
+      "lessonDate": "2026-02-27",
+      "lessonTime": "12:30",
+      "lessonDatetime": "2026-02-27T12:30:00+02:00",
+      "zoomLink": "https://us06web.zoom.us/j/81594987564?pwd=q64La2teZj6wV5EvFKrZkae3mDbxbD.1",
+      "name": ""
+    },
+    "runAt": 1772101800000,
+    "attempts": 0
+  },
+  {
+    "id": "9723d99d-97fd-4144-ae6d-2ce7af8866aa",
+    "type": "remind24h",
+    "data": {
+      "leadId": "b464f572-5271-439f-9178-711a98e05dea",
+      "tgId": 7996515405,
+      "lessonDate": "2026-02-25",
+      "lessonTime": "10:00",
+      "lessonDatetime": "2026-02-25T10:00:00+02:00",
+      "zoomLink": "https://us06web.zoom.us/j/86494472638?pwd=LgS203YlbrdxATeoZAEw6LiAm61MFr.1",
+      "name": "SSSS"
+    },
+    "runAt": 1771920000000,
+    "attempts": 0
+  },
+  {
+    "id": "f5e76171-3ee8-4c7c-8823-220e7d38d6e1",
+    "type": "abandonedFlow",
+    "data": {
+      "tgId": 7996515405
+    },
+    "runAt": 1771618309725,
+    "attempts": 0
+  }
+]
