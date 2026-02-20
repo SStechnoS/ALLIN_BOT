@@ -25,7 +25,7 @@ type ColName = keyof typeof COLS
 
 function getAuth() {
   return new google.auth.GoogleAuth({
-    credentials: JSON.parse(config.GOOGLE_SERVICE_ACCOUNT_JSON),
+    credentials: config.GOOGLE_SERVICE_ACCOUNT_JSON,
     scopes: ['https://www.googleapis.com/auth/spreadsheets']
   })
 }

@@ -33,7 +33,7 @@ const MANAGER_VIEW_FORMULA = `=IFERROR(QUERY(leads!A:AB;"SELECT B,C,D,E,F,H,I,Y,
 
 async function main() {
   const auth = new google.auth.GoogleAuth({
-    credentials: JSON.parse(config.GOOGLE_SERVICE_ACCOUNT_JSON),
+    credentials: config.GOOGLE_SERVICE_ACCOUNT_JSON,
     scopes: ['https://www.googleapis.com/auth/spreadsheets'],
   })
   const sheets = google.sheets({ version: 'v4', auth })
