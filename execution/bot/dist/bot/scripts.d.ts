@@ -1,0 +1,33 @@
+import type { Lead } from '../types';
+export declare const SCRIPTS: {
+    WELCOME_TEXT: string;
+    GDPR_REQUEST: string;
+    GDPR_DECLINED: string;
+    PHONE_REQUEST: string;
+    PHONE_INVALID: string;
+    PHONE_OK: string;
+    EMAIL_REQUEST: string;
+    EMAIL_INVALID: string;
+    EMAIL_OK: string;
+    NAME_REQUEST: string;
+    NAME_OK: (name: string) => string;
+    PICK_DATE: string;
+    PICK_TIME: (date: string) => string;
+    CONFIRM_BOOKING: (date: string, time: string) => string;
+    CREATING_ZOOM: string;
+    BOOKING_SUCCESS: (date: string, time: string, zoomLink: string) => string;
+    NO_SLOTS: string;
+    ZOOM_ERROR: string;
+    AI_ACTIVATED: string;
+    ALREADY_SCHEDULED: (lead: Lead) => string;
+    SCHEDULED_MENU: (lead: Lead | null) => string;
+    CONFIRMATION_SUCCESS: (lead: Lead) => string;
+    RESCHEDULE_RESPONSE: string;
+    STATUS_NO_BOOKING: string;
+    STATUS_SCHEDULED: (lead: Lead) => string;
+    STATUS_CONFIRMED: (lead: Lead) => string;
+    HELP: string;
+    UNKNOWN_MESSAGE: string;
+    ERROR_GENERIC: string;
+};
+//# sourceMappingURL=scripts.d.ts.map

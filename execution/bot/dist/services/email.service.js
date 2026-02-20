@@ -1,0 +1,73 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.emailService = void 0;
+const resend_1 = require("resend");
+const config_1 = require("../config");
+const logger_1 = require("../logger");
+const resend = new resend_1.Resend(config_1.config.RESEND_API_KEY);
+class EmailService {
+    async send(to, subject, html) {
+        const { error } = await resend.emails.send({
+            from: `${config_1.config.RESEND_FROM_NAME} <${config_1.config.RESEND_FROM_EMAIL}>`,
+            to,
+            subject,
+            html,
+        });
+        if (error) {
+            logger_1.logger.error({ error, to, subject }, 'Email send failed');
+            throw error;
+        }
+        logger_1.logger.info({ to, subject }, 'Email sent');
+    }
+    // Email #1: перейди в бот (30 мин после Tilda)
+    async sendEmail1(to, name) {
+        const subject = 'Ваша заявка принята — выберите удобное время 📅';
+        const html = `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <h2>Привет, ${name}!</h2>
+        <p>Спасибо, что заполнили заявку на пробный урок в <strong>All In Academy</strong> 🎉</p>
+        <p>Всё готово с нашей стороны — осталось выбрать удобное время для урока.</p>
+        <p>Это займёт всего 1 минуту:</p>
+        <p style="text-align: center; margin: 30px 0;">
+          <a href="${config_1.config.BOT_LINK}" style="background-color: #4F46E5; color: white; padding: 14px 28px; border-radius: 8px; text-decoration: none; font-size: 16px;">
+            Выбрать время →
+          </a>
+        </p>
+        <p>В нашем Telegram-боте вы:</p>
+        <ul>
+          <li>✅ Выберете удобную дату и время</li>
+          <li>✅ Получите ссылку на Zoom-встречу</li>
+          <li>✅ Узнаете всё о пробном уроке</li>
+        </ul>
+        <p>Пробный урок — <strong>бесплатно</strong>, без обязательств.</p>
+        <br>
+        <p>С уважением,<br>Команда All In Academy</p>
+        <p><a href="https://allinacademy.ee">allinacademy.ee</a></p>
+      </div>
+    `;
+        await this.send(to, subject, html);
+    }
+    // Email #2: финальное напоминание (24ч после email1)
+    async sendEmail2(to, name) {
+        const subject = 'Напоминаем — мы зарезервировали для вас место 🎓';
+        const html = `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <h2>Привет, ${name}!</h2>
+        <p>Вы заполнили заявку на пробный урок в All In Academy, но ещё не выбрали время.</p>
+        <p>Мы хотим убедиться, что вы не потеряли письмо и всё в порядке 😊</p>
+        <p>Пробный урок — это бесплатная диагностика уровня ребёнка в живом разговоре с преподавателем-носителем языка. Никакого стресса, просто общение.</p>
+        <p style="text-align: center; margin: 30px 0;">
+          <a href="${config_1.config.BOT_LINK}" style="background-color: #4F46E5; color: white; padding: 14px 28px; border-radius: 8px; text-decoration: none; font-size: 16px;">
+            Записаться →
+          </a>
+        </p>
+        <p>Если у вас есть вопросы — наш менеджер готов ответить: <a href="${config_1.config.MANAGER_LINK}">${config_1.config.MANAGER_USERNAME}</a></p>
+        <br>
+        <p>С уважением,<br>Команда All In Academy</p>
+      </div>
+    `;
+        await this.send(to, subject, html);
+    }
+}
+exports.emailService = new EmailService();
+//# sourceMappingURL=email.service.js.map
