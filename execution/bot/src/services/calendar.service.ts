@@ -9,7 +9,7 @@ const SLOT_TITLE = 'Пробный урок'
 
 function getAuth() {
   return new google.auth.GoogleAuth({
-    credentials: config.GOOGLE_SERVICE_ACCOUNT_JSON,
+    credentials: JSON.parse(config.GOOGLE_SERVICE_ACCOUNT_JSON),
     scopes: ['https://www.googleapis.com/auth/calendar'],
   })
 }

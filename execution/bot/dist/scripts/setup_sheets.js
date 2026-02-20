@@ -31,7 +31,7 @@ const LOG_HEADERS = ['timestamp', 'lead_id', 'event_type', 'details', 'actor'];
 const MANAGER_VIEW_FORMULA = `=IFERROR(QUERY(leads!A:AB;"SELECT B,C,D,E,F,H,I,Y,L,M,O,Z ORDER BY B DESC LABEL B 'Создан',C 'Имя',D 'Телефон',E 'Email',F 'Возраст',H 'TG @username',I 'Источник',Y 'Статус',L 'Дата урока',M 'Время',O 'Zoom ссылка',Z 'Заметки'";1);"Нет данных")`;
 async function main() {
     const auth = new googleapis_1.google.auth.GoogleAuth({
-        credentials: config_1.config.GOOGLE_SERVICE_ACCOUNT_JSON,
+        credentials: JSON.parse(config_1.config.GOOGLE_SERVICE_ACCOUNT_JSON),
         scopes: ['https://www.googleapis.com/auth/spreadsheets'],
     });
     const sheets = googleapis_1.google.sheets({ version: 'v4', auth });

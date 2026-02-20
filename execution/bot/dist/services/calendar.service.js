@@ -9,7 +9,7 @@ const TIMEZONE = 'Europe/Tallinn';
 const SLOT_TITLE = 'Пробный урок';
 function getAuth() {
     return new googleapis_1.google.auth.GoogleAuth({
-        credentials: config_1.config.GOOGLE_SERVICE_ACCOUNT_JSON,
+        credentials: JSON.parse(config_1.config.GOOGLE_SERVICE_ACCOUNT_JSON),
         scopes: ['https://www.googleapis.com/auth/calendar'],
     });
 }

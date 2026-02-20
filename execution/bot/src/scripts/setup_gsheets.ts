@@ -19,7 +19,7 @@ const LOG_HEADERS = ['timestamp', 'lead_id', 'event_type', 'details', 'actor']
 
 async function setup() {
   const auth = new google.auth.GoogleAuth({
-    credentials: config.GOOGLE_SERVICE_ACCOUNT_JSON,
+    credentials: JSON.parse(config.GOOGLE_SERVICE_ACCOUNT_JSON),
     scopes: ['https://www.googleapis.com/auth/spreadsheets']
   })
 
