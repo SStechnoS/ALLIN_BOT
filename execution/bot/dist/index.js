@@ -14,7 +14,6 @@ const redis_1 = require("./redis");
 const queues_1 = require("./queues");
 const sheets_service_1 = require("./services/sheets.service");
 const openai_service_1 = require("./services/openai.service");
-const ai_guard_1 = require("./services/ai.guard");
 const calendar_service_1 = require("./services/calendar.service");
 const zoom_service_1 = require("./services/zoom.service");
 const scripts_1 = require("./bot/scripts");
@@ -189,26 +188,8 @@ bot.on('text', async (ctx) => {
         await ctx.reply(scripts_1.SCRIPTS.AI_ACTIVATED);
         return;
     }
-    // AI триггер (вне строгих сцен)
-    if (ai_guard_1.aiGuard.isAITrigger(text, step || '')) {
-        await handleAI(ctx, text);
-        return;
-    }
-    // Социальные фразы — дружелюбный ответ вместо "не понял"
-    const SOCIAL_WORDS = new Set([
-        'спасибо', 'спс', 'благодарю', 'thanks', 'thank', 'ty',
-        'привет', 'hi', 'hello', 'hey', 'здравствуйте', 'здравствуй',
-        'ок', 'окей', 'ok', 'okay', 'хорошо', 'ладно', 'понял', 'поняла',
-        'понятно', 'принято', 'принял', 'ясно', 'отлично', 'супер', 'круто', 'класс',
-        'пока', 'bye', 'до', 'свидания',
-        '👍', '👋', '🙏', '😊', '❤️', '🔥', '🎉',
-    ]);
-    const normalized = text.toLowerCase().trim().replace(/[!.,?…]+$/, '');
-    if (normalized.split(/\s+/).every(w => SOCIAL_WORDS.has(w))) {
-        await ctx.reply('Всегда рады! 😊\n\nЕсли есть вопросы о школе — /ai\nЗаписаться на урок — /start');
-        return;
-    }
-    await ctx.reply(scripts_1.SCRIPTS.UNKNOWN_MESSAGE);
+    // Всё остальное → AI (любой вопрос или фраза)
+    await handleAI(ctx, text);
 });
 // Видео-кружок (video_note) — логируем file_id для WELCOME_VIDEO_FILE_ID
 bot.on('video_note', async (ctx) => {
