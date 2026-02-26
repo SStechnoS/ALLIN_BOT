@@ -7,6 +7,7 @@ import {
 } from '../services/calendar.service';
 import { getUserByTelegramId, createBooking } from '../services/user.service';
 import { createMeeting } from '../services/zoom.service';
+import { cancelNudges, scheduleLessonReminders } from '../jobs/notifications';
 import { syncUserRow } from '../services/sheets.service';
 import { formatDay, formatTime } from '../utils/format';
 import { sendMainMenu } from '../bot/keyboards';
@@ -191,6 +192,17 @@ bookingScene.action('booking_confirm', async (ctx) => {
     await ctx.answerCbQuery('Не удалось забронировать. Попробуйте ещё раз.');
     return;
   }
+
+  // Cancel nudge jobs, schedule lesson reminders
+  cancelNudges(ctx.from.id);
+  scheduleLessonReminders(
+    ctx.from.id,
+    eventStart,
+    eventId,
+    dayLabel,
+    timeLabel,
+    zoomLink ?? '',
+  );
 
   // Sync sheet row with booking data
   if (user.sheets_row) {

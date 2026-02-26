@@ -7,7 +7,8 @@ import { sendMainMenu } from './keyboards';
 import { onboardingScene, SCENE_ONBOARDING } from '../scenes/onboarding.scene';
 import { bookingScene, SCENE_BOOKING } from '../scenes/booking.scene';
 import { registerMenuHandlers } from '../handlers/menu.handler';
-import { getUserByTelegramId, getUserBooking } from '../services/user.service';
+import { getUserByTelegramId, getUserBooking, confirmLesson } from '../services/user.service';
+import { startScheduler } from '../jobs/scheduler';
 
 export function createBot(): Telegraf<BotContext> {
   const bot = new Telegraf<BotContext>(config.bot.token);
@@ -55,6 +56,21 @@ export function createBot(): Telegraf<BotContext> {
   );
 
   registerMenuHandlers(bot);
+
+  // ── Lesson confirmation (from 24h reminder inline button) ─────────────────
+  bot.action(/^confirm_lesson_(.+)$/, async (ctx) => {
+    await ctx.answerCbQuery('Участие подтверждено! До встречи 👋');
+    if (!ctx.from) return;
+    const user = getUserByTelegramId(ctx.from.id);
+    if (!user) return;
+    confirmLesson(user.id);
+    await ctx.editMessageReplyMarkup({ inline_keyboard: [] });
+  });
+
+  // ── Noop (placeholder buttons that do nothing) ────────────────────────────
+  bot.action('noop', (ctx) => ctx.answerCbQuery());
+
+  startScheduler(bot);
 
   return bot;
 }

@@ -21,6 +21,7 @@ export interface BookingRow {
   event_end: number;
   zoom_link: string | null;
   zoom_meeting_id: string | null;
+  lesson_confirmed_at: number | null;
 }
 
 export interface CreateBookingInput {
@@ -86,6 +87,12 @@ export function getUserBooking(userId: number): BookingRow | undefined {
 
 export function deleteUserBooking(userId: number): void {
   getDb().prepare('DELETE FROM bookings WHERE user_id = ?').run(userId);
+}
+
+export function confirmLesson(userId: number): void {
+  getDb()
+    .prepare('UPDATE bookings SET lesson_confirmed_at = unixepoch() WHERE user_id = ?')
+    .run(userId);
 }
 
 export function createBooking(data: CreateBookingInput): void {

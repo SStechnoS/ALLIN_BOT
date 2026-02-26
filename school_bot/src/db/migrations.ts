@@ -50,6 +50,26 @@ const MIGRATIONS: { version: number; sql: string }[] = [
       ALTER TABLE bookings ADD COLUMN zoom_meeting_id TEXT;
     `,
   },
+  {
+    version: 5,
+    sql: `
+      ALTER TABLE bookings ADD COLUMN lesson_confirmed_at INTEGER;
+
+      CREATE TABLE IF NOT EXISTS jobs (
+        id           INTEGER PRIMARY KEY AUTOINCREMENT,
+        type         TEXT NOT NULL,
+        tg_id        INTEGER NOT NULL,
+        scheduled_at INTEGER NOT NULL,
+        payload      TEXT NOT NULL DEFAULT '{}',
+        sent_at      INTEGER,
+        cancelled_at INTEGER
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_jobs_due
+        ON jobs (scheduled_at)
+        WHERE sent_at IS NULL AND cancelled_at IS NULL;
+    `,
+  },
 ];
 
 export function runMigrations(db: Database.Database): void {

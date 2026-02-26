@@ -3,6 +3,7 @@ import type { BotContext } from '../types';
 import { config } from '../config';
 import { createOrGetUser, finalizeUser, updateUserSheetsRow } from '../services/user.service';
 import { appendUserRow, syncUserRow } from '../services/sheets.service';
+import { scheduleNudges } from '../jobs/notifications';
 import { logger } from '../logger';
 
 export const SCENE_ONBOARDING = 'onboarding';
@@ -71,6 +72,7 @@ onboardingScene.enter(async (ctx) => {
           });
           s(ctx).sheetsRow = sheetsRow;
           updateUserSheetsRow(user.id, sheetsRow);
+          scheduleNudges(ctx.from.id, now);
         } catch (err) {
           logger.error('Failed to append sheet row on onboarding enter', { err });
         }

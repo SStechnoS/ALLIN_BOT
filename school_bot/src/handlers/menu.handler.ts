@@ -9,6 +9,7 @@ import { cancelSlot } from '../services/calendar.service';
 import { syncUserRow } from '../services/sheets.service';
 import { formatDay, formatTime } from '../utils/format';
 import { MAIN_MENU_BTN, RESCHEDULE_BTN } from '../bot/keyboards';
+import { cancelLessonReminders, scheduleNudges } from '../jobs/notifications';
 import { SCENE_BOOKING } from '../scenes/booking.scene';
 import { logger } from '../logger';
 
@@ -72,6 +73,10 @@ export function registerMenuHandlers(bot: Telegraf<BotContext>): void {
     }
 
     deleteUserBooking(user.id);
+
+    // Cancel lesson reminders, schedule new nudges
+    cancelLessonReminders(ctx.from.id);
+    scheduleNudges(ctx.from.id, Math.floor(Date.now() / 1000));
 
     // Sync sheet: clear lesson data, set status to rescheduling
     if (user.sheets_row) {
