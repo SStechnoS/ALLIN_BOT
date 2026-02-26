@@ -28,6 +28,9 @@ declare const COLS: {
     readonly manager_notes: 25;
     readonly last_updated: 26;
     readonly calendar_event_id: 27;
+    readonly push_count: 28;
+    readonly attended: 29;
+    readonly teacher_notes: 30;
 };
 type ColName = keyof typeof COLS;
 declare class SheetsService {
@@ -38,6 +41,11 @@ declare class SheetsService {
     findById(id: string): Promise<Lead | null>;
     findByTgId(tgId: number): Promise<Lead | null>;
     findByEmail(email: string): Promise<Lead | null>;
+    findByPhone(phone: string): Promise<Lead | null>;
+    findByDate(date: string): Promise<Lead[]>;
+    findAllScheduled(): Promise<Lead[]>;
+    incrementPushCount(leadId: string): Promise<void>;
+    markAttendance(leadId: string, attended: boolean): Promise<void>;
     upsertLead(data: {
         name?: string;
         phone?: string;

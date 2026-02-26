@@ -1,0 +1,1 @@
+{"version":3,"file":"gsheets.sync.d.ts","sourceRoot":"","sources":["../../src/services/gsheets.sync.ts"],"names":[],"mappings":"AAQA,OAAO,KAAK,EAAE,IAAI,EAAE,MAAM,UAAU,CAAA;AA8CpC,cAAM,kBAAkB;IACtB,OAAO,CAAC,SAAS,CAAY;IAE7B,OAAO,CAAC,MAAM;YAiBA,aAAa;YAgBb,WAAW;IAanB,QAAQ,CAAC,IAAI,EAAE,IAAI,GAAG,OAAO,CAAC,IAAI,CAAC;CA+B1C;AAED,eAAO,MAAM,kBAAkB,oBAA2B,CAAA"}

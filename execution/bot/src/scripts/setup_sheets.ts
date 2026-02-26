@@ -20,6 +20,7 @@ const LEADS_HEADERS = [
   'confirmed', 'confirmed_at', 'email_1_sent', 'email_1_sent_at',
   'email_2_sent', 'email_2_sent_at', 'gdpr_accepted', 'gdpr_accepted_at',
   'status', 'manager_notes', 'last_updated', 'calendar_event_id',
+  'push_count', 'attended', 'teacher_notes',
 ]
 
 const LOG_HEADERS = ['timestamp', 'lead_id', 'event_type', 'details', 'actor']
@@ -62,7 +63,7 @@ async function main() {
   // Добавить заголовки в leads (строка 1)
   await sheets.spreadsheets.values.update({
     spreadsheetId,
-    range: 'leads!A1:AB1',
+    range: 'leads!A1:AE1',
     valueInputOption: 'RAW',
     requestBody: { values: [LEADS_HEADERS] },
   })

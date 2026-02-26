@@ -1,5 +1,6 @@
 declare class EmailService {
     private send;
+    private wrapCustomText;
     sendEmail1(to: string, name: string): Promise<void>;
     sendEmail2(to: string, name: string): Promise<void>;
 }

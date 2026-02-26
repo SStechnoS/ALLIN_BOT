@@ -10,22 +10,34 @@ const telegraf_1 = require("telegraf");
 const libphonenumber_js_1 = require("libphonenumber-js");
 const config_1 = require("./config");
 const logger_1 = require("./logger");
-const redis_1 = require("./redis");
+const kv_1 = require("./db/kv");
 const queues_1 = require("./queues");
-const sheets_service_1 = require("./services/sheets.service");
+const db_service_1 = require("./services/db.service");
 const openai_service_1 = require("./services/openai.service");
 const calendar_service_1 = require("./services/calendar.service");
 const zoom_service_1 = require("./services/zoom.service");
 const scripts_1 = require("./bot/scripts");
+const admin_bot_1 = require("./admin/admin.bot");
+const settings_1 = require("./admin/settings");
+function nowTs() {
+    const d = new Date();
+    const dd = String(d.getDate()).padStart(2, '0');
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const yyyy = d.getFullYear();
+    const hh = String(d.getHours()).padStart(2, '0');
+    const min = String(d.getMinutes()).padStart(2, '0');
+    return `${dd}.${mm}.${yyyy} ${hh}:${min}`;
+}
 // ============================================================
 // HELPERS
 // ============================================================
-const MONTHS_RU = ['янв', 'фев', 'мар', 'апр', 'май', 'июн', 'июл', 'авг', 'сен', 'окт', 'ноя', 'дек'];
 const DAYS_RU = ['вс', 'пн', 'вт', 'ср', 'чт', 'пт', 'сб'];
 function formatDateRu(dateStr) {
     const [year, month, day] = dateStr.split('-').map(Number);
     const d = new Date(Date.UTC(year, month - 1, day, 12, 0, 0));
-    return `${day} ${MONTHS_RU[d.getUTCMonth()]} (${DAYS_RU[d.getUTCDay()]})`;
+    const dd = String(day).padStart(2, '0');
+    const mm = String(month).padStart(2, '0');
+    return `${dd}.${mm}.${year} (${DAYS_RU[d.getUTCDay()]})`;
 }
 // Постоянное нижнее меню (ReplyKeyboard)
 const MAIN_MENU_KEYBOARD = {
@@ -43,12 +55,12 @@ async function sendMainMenu(ctx, text = 'Чем могу помочь?') {
 // BOT SETUP
 // ============================================================
 const bot = new telegraf_1.Telegraf(config_1.config.BOT_TOKEN);
-// Session middleware (in-memory store)
+// Session middleware — backed by SQLite
 bot.use((0, telegraf_1.session)({
     store: {
         async get(key) {
             try {
-                const val = await redis_1.redis.get(`session:${key}`);
+                const val = (0, kv_1.kvGet)(`session:${key}`);
                 return val ? JSON.parse(val) : undefined;
             }
             catch {
@@ -56,10 +68,10 @@ bot.use((0, telegraf_1.session)({
             }
         },
         async set(key, value) {
-            await redis_1.redis.set(`session:${key}`, JSON.stringify(value), 'EX', 86400);
+            (0, kv_1.kvSet)(`session:${key}`, JSON.stringify(value), 86400);
         },
         async delete(key) {
-            await redis_1.redis.del(`session:${key}`);
+            (0, kv_1.kvDel)(`session:${key}`);
         }
     }
 }));
@@ -74,11 +86,34 @@ bot.use(async (ctx, next) => {
 // ============================================================
 // /start
 bot.start(async (ctx) => {
-    ctx.session = {}; // сброс сессии
-    await ctx.reply(scripts_1.SCRIPTS.WELCOME_TEXT);
-    if (config_1.config.WELCOME_VIDEO_FILE_ID) {
+    const existing = await db_service_1.dbService.findByTgId(ctx.from.id);
+    // Возвращающийся с активным бронированием
+    if (existing?.lesson_date && (existing.status === 'SCHEDULED' || existing.status === 'CONFIRMED')) {
+        ctx.session = { leadId: existing.id, gdprAccepted: true };
+        await ctx.reply(scripts_1.SCRIPTS.RETURNING_WITH_BOOKING(existing), { reply_markup: MAIN_MENU_KEYBOARD });
+        return;
+    }
+    // Возвращающийся — GDPR дал, данные есть, время не выбрал
+    if (existing?.gdpr_accepted && existing?.phone && existing?.email && existing?.name) {
+        ctx.session = {
+            leadId: existing.id,
+            gdprAccepted: true,
+            phone: existing.phone,
+            email: existing.email,
+            name: existing.name,
+            registrationStep: 'date',
+        };
+        await ctx.reply(scripts_1.SCRIPTS.RETURNING_NO_DATE(existing));
+        await showDatePicker(ctx);
+        return;
+    }
+    // Новый пользователь — полное приветствие
+    ctx.session = {};
+    await ctx.reply((0, settings_1.getSetting)('welcome_text') || scripts_1.SCRIPTS.WELCOME_TEXT);
+    const videoFileId = (0, settings_1.getSetting)('welcome_video_file_id') || config_1.config.WELCOME_VIDEO_FILE_ID;
+    if (videoFileId) {
         try {
-            await ctx.telegram.sendVideoNote(ctx.chat.id, config_1.config.WELCOME_VIDEO_FILE_ID);
+            await ctx.telegram.sendVideoNote(ctx.chat.id, videoFileId);
         }
         catch (e) {
             logger_1.logger.warn({ e }, 'sendVideoNote failed, skipping');
@@ -97,17 +132,33 @@ bot.start(async (ctx) => {
 bot.action('gdpr_accept', async (ctx) => {
     await ctx.answerCbQuery();
     ctx.session.gdprAccepted = true;
-    // Проверка существующей записи
-    const existing = await sheets_service_1.sheetsService.findByTgId(ctx.from.id);
+    const existing = await db_service_1.dbService.findByTgId(ctx.from.id);
+    // Уже есть активная запись
     if (existing?.status === 'SCHEDULED' || existing?.status === 'CONFIRMED') {
         ctx.session.leadId = existing.id;
         await ctx.reply(scripts_1.SCRIPTS.ALREADY_SCHEDULED(existing), { reply_markup: MAIN_MENU_KEYBOARD });
         return;
     }
-    // Начать регистрацию
+    // Данные уже есть — пропустить анкету, сразу к дате
+    if (existing?.phone && existing?.email && existing?.name) {
+        ctx.session.leadId = existing.id;
+        ctx.session.phone = existing.phone;
+        ctx.session.email = existing.email;
+        ctx.session.name = existing.name;
+        ctx.session.registrationStep = 'date';
+        await ctx.reply(`С возвращением, ${existing.name}! 👋\n\nВыберите удобное время для урока:`);
+        await showDatePicker(ctx);
+        return;
+    }
+    // Новый пользователь — стандартная регистрация
     ctx.session.registrationStep = 'phone';
-    // Планируем nudge: если через 2ч регистрация не завершена — напомнить
-    await queues_1.flowQueue.add('abandonedFlow', { tgId: ctx.from.id }, { delay: 2 * 60 * 60 * 1000 });
+    // Nudge через 2ч если регистрация не завершена.
+    // SQLite-флаг чтобы не дублировать job при повторных нажатиях GDPR.
+    const abandonedKey = `abandoned:scheduled:${ctx.from.id}`;
+    if (!(0, kv_1.kvGet)(abandonedKey)) {
+        await queues_1.flowQueue.add('abandonedFlow', { tgId: ctx.from.id }, { delay: 2 * 60 * 60 * 1000 });
+        (0, kv_1.kvSet)(abandonedKey, '1', 3 * 60 * 60); // TTL 3ч
+    }
     await ctx.reply(scripts_1.SCRIPTS.PHONE_REQUEST, {
         reply_markup: {
             keyboard: [[{ text: '📱 Поделиться номером', request_contact: true }]],
@@ -123,8 +174,8 @@ bot.command('help', async (ctx) => {
 // /status
 bot.command('status', async (ctx) => {
     const lead = ctx.session.leadId
-        ? await sheets_service_1.sheetsService.findById(ctx.session.leadId)
-        : await sheets_service_1.sheetsService.findByTgId(ctx.from.id);
+        ? await db_service_1.dbService.findById(ctx.session.leadId)
+        : await db_service_1.dbService.findByTgId(ctx.from.id);
     if (!lead || !lead.lesson_date) {
         await ctx.reply(scripts_1.SCRIPTS.STATUS_NO_BOOKING);
         return;
@@ -262,15 +313,15 @@ async function handleName(ctx, name) {
     ctx.session.name = name;
     ctx.session.registrationStep = 'date';
     // Сохранить в GSheets
-    const leadId = await sheets_service_1.sheetsService.upsertLead({
+    const leadId = await db_service_1.dbService.upsertLead({
         name, phone: ctx.session.phone, email: ctx.session.email,
         tg_id: ctx.from.id, tg_username: ctx.from.username,
         source: 'direct_bot', gdprAccepted: ctx.session.gdprAccepted
     });
     ctx.session.leadId = leadId;
-    await sheets_service_1.sheetsService.updateField(leadId, 'bot_activated', true);
-    await sheets_service_1.sheetsService.updateField(leadId, 'bot_activated_at', new Date().toISOString());
-    await sheets_service_1.sheetsService.updateField(leadId, 'status', 'BOT_ACTIVE');
+    await db_service_1.dbService.updateField(leadId, 'bot_activated', true);
+    await db_service_1.dbService.updateField(leadId, 'bot_activated_at', nowTs());
+    await db_service_1.dbService.updateField(leadId, 'status', 'BOT_ACTIVE');
     await ctx.reply(scripts_1.SCRIPTS.NAME_OK(name));
     await showDatePicker(ctx);
 }
@@ -279,8 +330,8 @@ async function handleName(ctx, name) {
 // ============================================================
 async function handleMyBooking(ctx) {
     const lead = ctx.session.leadId
-        ? await sheets_service_1.sheetsService.findById(ctx.session.leadId)
-        : await sheets_service_1.sheetsService.findByTgId(ctx.from.id);
+        ? await db_service_1.dbService.findById(ctx.session.leadId)
+        : await db_service_1.dbService.findByTgId(ctx.from.id);
     if (!lead || !lead.lesson_date) {
         await ctx.reply('У вас нет активной записи.\n\nНажмите /start чтобы записаться на бесплатный пробный урок.');
         return;
@@ -323,20 +374,20 @@ async function performReschedule(lead, tgId) {
         }
     }
     // Очистить данные урока в GSheets
-    await sheets_service_1.sheetsService.updateLead(lead.id, {
+    await db_service_1.dbService.updateLead(lead.id, {
         lesson_date: '', lesson_time: '', lesson_datetime: '',
         zoom_link: '', zoom_meeting_id: '', calendar_event_id: '',
         confirmed: false, confirmed_at: '', status: 'BOT_ACTIVE',
     });
-    await sheets_service_1.sheetsService.appendLog(lead.id, 'RESCHEDULED', { via: 'self_service' });
+    await db_service_1.dbService.appendLog(lead.id, 'RESCHEDULED', { via: 'self_service' });
     // Уведомить менеджера
     const tgUsernameR = lead.tg_username ? `@${lead.tg_username}` : '—';
-    await bot.telegram.sendMessage(config_1.config.ADMIN_GROUP_ID, `🔄 САМОПЕРЕНОС\n\n👤 ${lead.name}\n📱 ${lead.phone}\n💬 Telegram: ${tgUsernameR}\n📅 Был: ${lead.lesson_date} в ${lead.lesson_time}`);
+    await bot.telegram.sendMessage(config_1.config.ADMIN_GROUP_ID, `🔄 САМОПЕРЕНОС\n\n👤 ${lead.name}\n📱 ${lead.phone}\n💬 Telegram: ${tgUsernameR}\n📅 Был: ${formatDateRu(lead.lesson_date)} в ${lead.lesson_time}`);
 }
 async function handleRescheduleRequest(ctx) {
     const lead = ctx.session.leadId
-        ? await sheets_service_1.sheetsService.findById(ctx.session.leadId)
-        : await sheets_service_1.sheetsService.findByTgId(ctx.from.id);
+        ? await db_service_1.dbService.findById(ctx.session.leadId)
+        : await db_service_1.dbService.findByTgId(ctx.from.id);
     if (!lead || !lead.lesson_date) {
         await ctx.reply('У вас нет активной записи для переноса.');
         return;
@@ -351,6 +402,9 @@ async function handleRescheduleRequest(ctx) {
     try {
         await performReschedule(lead, ctx.from.id);
         ctx.session.leadId = lead.id;
+        ctx.session.name = lead.name;
+        ctx.session.phone = lead.phone;
+        ctx.session.email = lead.email;
         ctx.session.registrationStep = 'date';
         await ctx.reply('Запись отменена ✅\n\nВыберите новое удобное время:');
         await showDatePicker(ctx);
@@ -483,7 +537,7 @@ bot.action('confirm_booking', async (ctx) => {
             zoomMeetingId = String(meeting.id);
         }
         // Сохранить в GSheets
-        await sheets_service_1.sheetsService.updateLead(leadId, {
+        await db_service_1.dbService.updateLead(leadId, {
             lesson_date: selectedDate,
             lesson_time: selectedTime,
             lesson_datetime: lessonDatetime_,
@@ -492,7 +546,7 @@ bot.action('confirm_booking', async (ctx) => {
             calendar_event_id: selectedCalEventId,
             status: 'SCHEDULED',
         });
-        await sheets_service_1.sheetsService.appendLog(leadId, 'SCHEDULED', { date: selectedDate, time: selectedTime, zoom: zoomLink });
+        await db_service_1.dbService.appendLog(leadId, 'SCHEDULED', { date: selectedDate, time: selectedTime, zoom: zoomLink });
         // Запланировать напоминание T-24h
         const lessonMs = new Date(lessonDatetime_).getTime();
         const delay24h = lessonMs - Date.now() - 24 * 60 * 60 * 1000;
@@ -510,7 +564,7 @@ bot.action('confirm_booking', async (ctx) => {
         await bot.telegram.sendMessage(config_1.config.ADMIN_GROUP_ID, `🟢 НОВАЯ ЗАПИСЬ\n\n` +
             `👤 ${name}\n📱 ${phone || '—'}\n📧 ${email || '—'}\n` +
             `💬 Telegram: ${tgUsername}\n` +
-            `📅 ${selectedDate} в ${selectedTime} (Таллин)\n📹 ${zoomLink || '—'}`);
+            `📅 ${formatDateRu(selectedDate)} в ${selectedTime} (Таллин)\n📹 ${zoomLink || '—'}`);
         // Очистить данные выбора из сессии
         ctx.session.selectedCalEventId = undefined;
         ctx.session.selectedDate = undefined;
@@ -531,6 +585,19 @@ bot.action('confirm_booking', async (ctx) => {
         logger_1.logger.error({ err }, 'confirm_booking error');
         await ctx.reply(scripts_1.SCRIPTS.ERROR_GENERIC);
     }
+});
+// Кнопка из nudge-сообщения — сразу к выбору даты
+bot.action('pick_date_nudge', async (ctx) => {
+    await ctx.answerCbQuery();
+    const existing = await db_service_1.dbService.findByTgId(ctx.from.id);
+    if (existing) {
+        ctx.session.leadId = existing.id;
+        ctx.session.name = existing.name;
+        ctx.session.phone = existing.phone;
+        ctx.session.email = existing.email;
+        ctx.session.registrationStep = 'date';
+    }
+    await showDatePicker(ctx);
 });
 // ============================================================
 // AI HANDLER
@@ -556,19 +623,19 @@ bot.action('activate_ai', async (ctx) => {
 bot.action(/^confirm:(.+)$/, async (ctx) => {
     const leadId = ctx.match[1];
     await ctx.answerCbQuery('✅ Подтверждено!');
-    await sheets_service_1.sheetsService.updateLead(leadId, {
+    await db_service_1.dbService.updateLead(leadId, {
         confirmed: true,
-        confirmed_at: new Date().toISOString(),
+        confirmed_at: nowTs(),
         status: 'CONFIRMED'
     });
-    await sheets_service_1.sheetsService.appendLog(leadId, 'CONFIRMED', {});
-    const lead = await sheets_service_1.sheetsService.findById(leadId);
+    await db_service_1.dbService.appendLog(leadId, 'CONFIRMED', {});
+    const lead = await db_service_1.dbService.findById(leadId);
     if (lead) {
         const tgUsername = lead.tg_username ? `@${lead.tg_username}` : '—';
         const adminMsg = `🟢 ПОДТВЕРДИЛ УЧАСТИЕ\n\n` +
             `👤 ${lead.name}\n📱 ${lead.phone}\n📧 ${lead.email}\n` +
             `💬 Telegram: ${tgUsername}\n` +
-            `📅 ${lead.lesson_date} в ${lead.lesson_time}\n📹 ${lead.zoom_link}`;
+            `📅 ${formatDateRu(lead.lesson_date)} в ${lead.lesson_time}\n📹 ${lead.zoom_link}`;
         await bot.telegram.sendMessage(config_1.config.ADMIN_GROUP_ID, adminMsg);
         await ctx.editMessageText(scripts_1.SCRIPTS.CONFIRMATION_SUCCESS(lead));
     }
@@ -576,7 +643,7 @@ bot.action(/^confirm:(.+)$/, async (ctx) => {
 bot.action(/^reschedule:(.+)$/, async (ctx) => {
     const leadId = ctx.match[1];
     await ctx.answerCbQuery();
-    const lead = await sheets_service_1.sheetsService.findById(leadId);
+    const lead = await db_service_1.dbService.findById(leadId);
     if (!lead || !lead.lesson_date) {
         await ctx.editMessageText('Запись не найдена.');
         return;
@@ -603,7 +670,7 @@ bot.action(/^reschedule:(.+)$/, async (ctx) => {
 });
 bot.action('show_status', async (ctx) => {
     await ctx.answerCbQuery();
-    const lead = ctx.session.leadId ? await sheets_service_1.sheetsService.findById(ctx.session.leadId) : null;
+    const lead = ctx.session.leadId ? await db_service_1.dbService.findById(ctx.session.leadId) : null;
     if (lead?.lesson_date) {
         await ctx.reply(lead.confirmed ? scripts_1.SCRIPTS.STATUS_CONFIRMED(lead) : scripts_1.SCRIPTS.STATUS_SCHEDULED(lead));
     }
@@ -632,7 +699,7 @@ async function handleTildaWebhook(body) {
         logger_1.logger.warn({ body }, 'Tilda webhook: empty lead, skipping');
         return;
     }
-    const leadId = await sheets_service_1.sheetsService.upsertLead({
+    const leadId = await db_service_1.dbService.upsertLead({
         name, phone, email,
         child_age: parseInt(child_age || '0'),
         source: 'tilda'
@@ -658,18 +725,20 @@ app.post('/webhook/tilda', {
     schema: { headers: { type: 'object' } }
 }, async (req, reply) => {
     const body = req.body;
-    // Tilda тест-пинг: тело = "test=true" — пропускаем без проверки секрета
-    if (body?.test === 'true') {
+    // Tilda тест-пинг: тело = "test=test" или "test=true" — пропускаем без проверки секрета
+    if (body?.test === 'test' || body?.test === 'true') {
         logger_1.logger.info('Tilda webhook: test ping OK');
         return reply.send({ ok: true });
     }
-    // Tilda может слать секрет: в теле запроса (поле 'secret'), заголовке, или query param
-    const secret = body?.secret ||
-        req.query?.secret ||
+    // Tilda может слать секрет в разных местах (зависит от версии/настроек)
+    const q = req.query;
+    const secret = body?.secret || body?.key || body?.formkey || body?.api_key ||
+        q?.secret || q?.key || q?.api_key ||
         req.headers['x-tilda-secret'] ||
         req.headers['x-secret'];
+    logger_1.logger.info({ body, query: q, secret: secret?.slice(0, 8) + '...' }, 'Tilda webhook incoming');
     if (config_1.config.TILDA_WEBHOOK_SECRET && secret !== config_1.config.TILDA_WEBHOOK_SECRET) {
-        logger_1.logger.warn({ receivedSecret: secret }, 'Tilda webhook: invalid secret');
+        logger_1.logger.warn({ receivedSecret: secret, body }, 'Tilda webhook: invalid secret');
         return reply.code(403).send({ error: 'Forbidden' });
     }
     try {
@@ -700,6 +769,12 @@ async function main() {
     (0, queues_1.injectBot)(bot);
     // Start BullMQ workers
     (0, queues_1.startWorkers)();
+    // Start admin bot (always polling, separate from main bot)
+    const adminBot = (0, admin_bot_1.createAdminBot)(bot.telegram);
+    if (adminBot) {
+        adminBot.launch();
+        logger_1.logger.info('Admin bot started in polling mode');
+    }
     // Setup Telegram webhook or polling
     if (config_1.config.IS_PRODUCTION && config_1.config.WEBHOOK_HOST) {
         const webhookUrl = `${config_1.config.WEBHOOK_HOST}/webhook/telegram`;
@@ -711,9 +786,19 @@ async function main() {
         bot.launch();
         logger_1.logger.info('Bot started in polling mode (development)');
     }
-    // Start HTTP server
-    await app.listen({ port: config_1.config.APP_PORT, host: '0.0.0.0' });
-    logger_1.logger.info({ port: config_1.config.APP_PORT }, 'Server started');
+    // Start HTTP server (non-fatal in dev — webhooks not needed in polling mode)
+    try {
+        await app.listen({ port: config_1.config.APP_PORT, host: '0.0.0.0' });
+        logger_1.logger.info({ port: config_1.config.APP_PORT }, 'Server started');
+    }
+    catch (err) {
+        if (!config_1.config.IS_PRODUCTION && err?.code === 'EADDRINUSE') {
+            logger_1.logger.warn({ port: config_1.config.APP_PORT }, 'HTTP server port busy — skipped in dev mode');
+        }
+        else {
+            throw err;
+        }
+    }
 }
 main().catch((err) => {
     logger_1.logger.error({ err }, 'Fatal startup error');
@@ -723,11 +808,9 @@ main().catch((err) => {
 process.once('SIGINT', async () => {
     bot.stop('SIGINT');
     await app.close();
-    await redis_1.redis.quit();
 });
 process.once('SIGTERM', async () => {
     bot.stop('SIGTERM');
     await app.close();
-    await redis_1.redis.quit();
 });
 //# sourceMappingURL=index.js.map

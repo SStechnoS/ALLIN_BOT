@@ -20,6 +20,8 @@ export declare const config: {
     readonly WEBHOOK_HOST: string;
     readonly TILDA_WEBHOOK_SECRET: string;
     readonly INTERNAL_SECRET: string;
+    readonly ADMIN_BOT_TOKEN: string;
+    readonly ADMIN_IDS: string[];
     readonly IS_PRODUCTION: boolean;
     readonly MANAGER_LINK: string;
 };

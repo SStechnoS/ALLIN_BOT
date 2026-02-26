@@ -1,4 +1,4 @@
-type JobType = 'email1' | 'email2' | 'callAlert' | 'remind24h' | 'remind5h' | 'abandonedFlow';
+type JobType = 'email1' | 'email2' | 'callAlert' | 'remind24h' | 'remind5h' | 'abandonedFlow' | 'checkConfirm4h';
 declare class SimpleQueue {
     add(_name: JobType, data: any, options?: {
         delay?: number;

@@ -7,6 +7,14 @@ import type { Lead } from '../types'
 
 const ML = config.MANAGER_LINK
 
+// Форматирует YYYY-MM-DD → DD.MM.YYYY
+function fmtDate(dateStr: string | undefined): string {
+  if (!dateStr) return ''
+  const [year, month, day] = dateStr.split('-')
+  if (!year || !month || !day) return dateStr
+  return `${day}.${month}.${year}`
+}
+
 export const SCRIPTS = {
   // === WELCOME ===
   WELCOME_TEXT:
@@ -76,13 +84,28 @@ export const SCRIPTS = {
     `Я ассистент All In Academy — задайте любой вопрос о школе и обучении.\n\n` +
     `Чтобы вернуться к записи, нажмите /menu`,
 
+  // === RETURNING USERS ===
+  RETURNING_WITH_BOOKING: (lead: Lead) =>
+    `С возвращением, ${lead.name}! 👋\n\n` +
+    `Ваш пробный урок уже запланирован:\n\n` +
+    `📅 ${fmtDate(lead.lesson_date)}\n` +
+    `🕐 ${lead.lesson_time} (по Таллину)\n` +
+    (lead.zoom_link ? `📹 Zoom: ${lead.zoom_link}\n\n` : '\n') +
+    `Нажмите **«📅 Моё бронирование»** чтобы посмотреть детали.\n\n` +
+    `Если хотите узнать больше об академии — задайте вопрос нашему AI-ассистенту 🤖 Можно голосом!\n\n` +
+    `Если нужна помощь — менеджер всегда на связи 📞`,
+
+  RETURNING_NO_DATE: (lead: Lead) =>
+    `С возвращением, ${lead.name}! 👋\n\n` +
+    `Осталось выбрать время для пробного урока — займёт буквально минуту 🙂`,
+
   // === SCHEDULED ===
   ALREADY_SCHEDULED: (lead: Lead) =>
-    `Вы уже записаны на пробный урок! 🎉\n\n📅 ${lead.lesson_date} в ${lead.lesson_time}`,
+    `Вы уже записаны на пробный урок! 🎉\n\n📅 ${fmtDate(lead.lesson_date)} в ${lead.lesson_time}`,
 
   SCHEDULED_MENU: (lead: Lead | null) =>
     `Вы записаны на пробный урок! ✅\n\n` +
-    `📅 ${lead?.lesson_date} в ${lead?.lesson_time}\n📹 ${lead?.zoom_link}\n\nЧем могу помочь?`,
+    `📅 ${fmtDate(lead?.lesson_date)} в ${lead?.lesson_time}\n📹 ${lead?.zoom_link}\n\nЧем могу помочь?`,
 
   // === CONFIRMATIONS ===
   CONFIRMATION_SUCCESS: (lead: Lead) =>
@@ -96,10 +119,10 @@ export const SCRIPTS = {
     `У вас пока нет активной записи.\n\nНажмите /start чтобы записаться на бесплатный пробный урок.`,
 
   STATUS_SCHEDULED: (lead: Lead) =>
-    `Ваша запись:\n\n📅 ${lead.lesson_date}\n🕐 ${lead.lesson_time} (по Таллину)\n📹 ${lead.zoom_link}\n✅ Статус: Запланирован`,
+    `Ваша запись:\n\n📅 ${fmtDate(lead.lesson_date)}\n🕐 ${lead.lesson_time} (по Таллину)\n📹 ${lead.zoom_link}\n✅ Статус: Запланирован`,
 
   STATUS_CONFIRMED: (lead: Lead) =>
-    `Ваша запись:\n\n📅 ${lead.lesson_date}\n🕐 ${lead.lesson_time} (по Таллину)\n📹 ${lead.zoom_link}\n✅ Статус: Подтверждён`,
+    `Ваша запись:\n\n📅 ${fmtDate(lead.lesson_date)}\n🕐 ${lead.lesson_time} (по Таллину)\n📹 ${lead.zoom_link}\n✅ Статус: Подтверждён`,
 
   // === HELP ===
   HELP:

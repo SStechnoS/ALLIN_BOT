@@ -19,6 +19,8 @@ export declare const SCRIPTS: {
     NO_SLOTS: string;
     ZOOM_ERROR: string;
     AI_ACTIVATED: string;
+    RETURNING_WITH_BOOKING: (lead: Lead) => string;
+    RETURNING_NO_DATE: (lead: Lead) => string;
     ALREADY_SCHEDULED: (lead: Lead) => string;
     SCHEDULED_MENU: (lead: Lead | null) => string;
     CONFIRMATION_SUCCESS: (lead: Lead) => string;

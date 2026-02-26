@@ -39,6 +39,7 @@ export type LeadStatus =
   | 'RESCHEDULED'
   | 'CALL_NEEDED'
   | 'ATTENDED'
+  | 'MISSED'
   | 'CANCELLED'
 
 // Модель лида (Google Sheets row)
@@ -71,6 +72,9 @@ export interface Lead {
   status: LeadStatus
   manager_notes: string
   last_updated: string
+  push_count: number
+  attended: boolean
+  teacher_notes: string
 }
 
 // BullMQ Job данные

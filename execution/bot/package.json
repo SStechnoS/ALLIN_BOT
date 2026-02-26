@@ -13,7 +13,9 @@
   },
   "dependencies": {
     "@fastify/formbody": "^7.4.0",
+    "@types/better-sqlite3": "^7.6.13",
     "axios": "^1.7.7",
+    "better-sqlite3": "^12.6.2",
     "date-fns": "^4.1.0",
     "date-fns-tz": "^3.2.0",
     "dotenv": "^16.4.5",

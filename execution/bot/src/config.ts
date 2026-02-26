@@ -26,10 +26,10 @@ export const config = {
   ZOOM_CLIENT_ID: optional('ZOOM_CLIENT_ID'),
   ZOOM_CLIENT_SECRET: optional('ZOOM_CLIENT_SECRET'),
 
-  // Google
-  GOOGLE_SERVICE_ACCOUNT_JSON: required('GOOGLE_SERVICE_ACCOUNT_JSON'),
-  GOOGLE_SHEETS_ID: required('GOOGLE_SHEETS_ID'),
-  GOOGLE_CALENDAR_ID: required('GOOGLE_CALENDAR_ID'),
+  // Google (Sheets replaced by SQLite — Calendar still used for slots)
+  GOOGLE_SERVICE_ACCOUNT_JSON: optional('GOOGLE_SERVICE_ACCOUNT_JSON'),
+  GOOGLE_SHEETS_ID: optional('GOOGLE_SHEETS_ID'),
+  GOOGLE_CALENDAR_ID: optional('GOOGLE_CALENDAR_ID'),
 
   // Resend
   RESEND_API_KEY: required('RESEND_API_KEY'),
@@ -42,6 +42,10 @@ export const config = {
   WEBHOOK_HOST: optional('WEBHOOK_HOST'),
   TILDA_WEBHOOK_SECRET: required('TILDA_WEBHOOK_SECRET'),
   INTERNAL_SECRET: required('INTERNAL_SECRET'),
+
+  // Admin bot
+  ADMIN_BOT_TOKEN: optional('ADMIN_BOT_TOKEN'),
+  ADMIN_IDS: optional('ADMIN_IDS', '').split(',').map(s => s.trim()).filter(Boolean),
 
   // Computed
   get IS_PRODUCTION() { return this.NODE_ENV === 'production' },

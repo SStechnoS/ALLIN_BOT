@@ -17,7 +17,7 @@ export interface SessionData {
 export type BotContext = Context & Scenes.SceneContext<Scenes.SceneSessionData> & {
     session: SessionData;
 };
-export type LeadStatus = 'NEW' | 'BOT_ACTIVE' | 'SCHEDULED' | 'CONFIRMED' | 'RESCHEDULED' | 'CALL_NEEDED' | 'ATTENDED' | 'CANCELLED';
+export type LeadStatus = 'NEW' | 'BOT_ACTIVE' | 'SCHEDULED' | 'CONFIRMED' | 'RESCHEDULED' | 'CALL_NEEDED' | 'ATTENDED' | 'MISSED' | 'CANCELLED';
 export interface Lead {
     id: string;
     created_at: string;
@@ -47,6 +47,9 @@ export interface Lead {
     status: LeadStatus;
     manager_notes: string;
     last_updated: string;
+    push_count: number;
+    attended: boolean;
+    teacher_notes: string;
 }
 export interface EmailJobData {
     leadId: string;

@@ -19,7 +19,23 @@ const COLS = {
     email_2_sent: 20, email_2_sent_at: 21, gdpr_accepted: 22, gdpr_accepted_at: 23,
     status: 24, manager_notes: 25, last_updated: 26,
     calendar_event_id: 27,
+    push_count: 28,
+    attended: 29,
+    teacher_notes: 30,
 };
+// Форматирует ISO-дату в DD.MM.YYYY HH:mm (Tallinn time) для отображения в таблице
+function formatTs(iso) {
+    const d = new Date(iso);
+    const dd = String(d.getDate()).padStart(2, '0');
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const yyyy = d.getFullYear();
+    const hh = String(d.getHours()).padStart(2, '0');
+    const min = String(d.getMinutes()).padStart(2, '0');
+    return `${dd}.${mm}.${yyyy} ${hh}:${min}`;
+}
+function nowFormatted() {
+    return formatTs(new Date().toISOString());
+}
 function getAuth() {
     return new googleapis_1.google.auth.GoogleAuth({
         credentials: JSON.parse(config_1.config.GOOGLE_SERVICE_ACCOUNT_JSON),
@@ -58,11 +74,14 @@ class SheetsService {
             status: row[COLS.status] || 'NEW',
             manager_notes: row[COLS.manager_notes] || '',
             last_updated: row[COLS.last_updated] || '',
+            push_count: parseInt(row[COLS.push_count] || '0'),
+            attended: row[COLS.attended] === 'true',
+            teacher_notes: row[COLS.teacher_notes] || '',
         };
     }
     buildRow(lead) {
-        const now = new Date().toISOString();
-        const row = new Array(28).fill('');
+        const now = nowFormatted();
+        const row = new Array(31).fill('');
         row[COLS.id] = lead.id;
         row[COLS.created_at] = lead.created_at || now;
         row[COLS.name] = lead.name || '';
@@ -73,17 +92,17 @@ class SheetsService {
         row[COLS.tg_username] = lead.tg_username || '';
         row[COLS.source] = lead.source || 'direct_bot';
         row[COLS.bot_activated] = (lead.bot_activated ?? false).toString();
-        row[COLS.bot_activated_at] = lead.bot_activated_at || '';
+        row[COLS.bot_activated_at] = lead.bot_activated_at ? formatTs(lead.bot_activated_at) : '';
         row[COLS.status] = lead.status || 'NEW';
         row[COLS.gdpr_accepted] = (lead.gdpr_accepted ?? false).toString();
-        row[COLS.gdpr_accepted_at] = lead.gdpr_accepted_at || '';
+        row[COLS.gdpr_accepted_at] = lead.gdpr_accepted_at ? formatTs(lead.gdpr_accepted_at) : '';
         row[COLS.last_updated] = now;
         return row;
     }
     async getAllRows() {
         const res = await this.sheets.spreadsheets.values.get({
             spreadsheetId: SHEETS_ID,
-            range: `${LEADS_SHEET}!A:AB`
+            range: `${LEADS_SHEET}!A:AE`
         });
         const rows = res.data.values || [];
         return rows.slice(1); // skip header row
@@ -111,11 +130,47 @@ class SheetsService {
         const row = rows.find(r => r[COLS.email]?.toLowerCase() === email.toLowerCase());
         return row ? this.rowToLead(row) : null;
     }
+    async findByPhone(phone) {
+        const rows = await this.getAllRows();
+        const row = rows.find(r => r[COLS.phone] === phone);
+        return row ? this.rowToLead(row) : null;
+    }
+    async findByDate(date) {
+        const rows = await this.getAllRows();
+        return rows
+            .filter(r => r[COLS.lesson_date] === date)
+            .map(r => this.rowToLead(r));
+    }
+    async findAllScheduled() {
+        const rows = await this.getAllRows();
+        const today = new Date().toISOString().split('T')[0];
+        return rows
+            .filter(r => r[COLS.lesson_date] >= today && ['SCHEDULED', 'CONFIRMED'].includes(r[COLS.status]))
+            .map(r => this.rowToLead(r));
+    }
+    async incrementPushCount(leadId) {
+        try {
+            const lead = await this.findById(leadId);
+            if (!lead)
+                return;
+            await this.updateField(leadId, 'push_count', (lead.push_count || 0) + 1);
+        }
+        catch (err) {
+            logger_1.logger.warn({ err, leadId }, 'incrementPushCount failed');
+        }
+    }
+    async markAttendance(leadId, attended) {
+        await this.updateField(leadId, 'attended', attended);
+        await this.updateField(leadId, 'status', attended ? 'ATTENDED' : 'MISSED');
+        await this.appendLog(leadId, attended ? 'ATTENDED' : 'MISSED', {});
+    }
     async upsertLead(data) {
-        // Найти существующий
-        const existing = data.email
-            ? await this.findByEmail(data.email)
-            : data.tg_id ? await this.findByTgId(data.tg_id) : null;
+        // Найти существующий: по email → tg_id → phone
+        let existing = data.email ? await this.findByEmail(data.email) : null;
+        if (!existing && data.tg_id)
+            existing = await this.findByTgId(data.tg_id);
+        if (!existing && data.phone)
+            existing = await this.findByPhone(data.phone);
         if (existing) {
             await this.updateLead(existing.id, {
                 ...(data.name && { name: data.name }),
@@ -124,17 +179,17 @@ class SheetsService {
                 ...(data.tg_username && { tg_username: data.tg_username }),
                 ...(data.gdprAccepted !== undefined && {
                     gdpr_accepted: data.gdprAccepted,
-                    gdpr_accepted_at: new Date().toISOString()
+                    gdpr_accepted_at: nowFormatted()
                 }),
                 bot_activated: true,
-                bot_activated_at: existing.bot_activated_at || new Date().toISOString(),
+                bot_activated_at: existing.bot_activated_at || nowFormatted(),
                 status: 'BOT_ACTIVE',
             });
             return existing.id;
         }
         // Создать новый
         const leadId = (0, uuid_1.v4)();
-        const now = new Date().toISOString();
+        const now = nowFormatted();
         const row = this.buildRow({
             id: leadId,
             created_at: now,
@@ -173,7 +228,7 @@ class SheetsService {
                 valueInputOption: 'RAW',
                 data: [
                     { range: `${LEADS_SHEET}!${colLetter}${sheetRow}`, values: [[value.toString()]] },
-                    { range: `${LEADS_SHEET}!AA${sheetRow}`, values: [[new Date().toISOString()]] },
+                    { range: `${LEADS_SHEET}!AA${sheetRow}`, values: [[nowFormatted()]] },
                 ]
             }
         });
@@ -193,7 +248,7 @@ class SheetsService {
             range: `${LOG_SHEET}!A:E`,
             valueInputOption: 'RAW',
             requestBody: {
-                values: [[new Date().toISOString(), leadId, eventType, JSON.stringify(details), actor]]
+                values: [[nowFormatted(), leadId, eventType, JSON.stringify(details), actor]]
             }
         });
     }
