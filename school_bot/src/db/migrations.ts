@@ -15,8 +15,30 @@ const MIGRATIONS: { version: number; sql: string }[] = [
       );
     `,
   },
-  // next migration example:
-  // { version: 2, sql: `ALTER TABLE sessions ADD COLUMN updated_at INTEGER;` },
+  {
+    version: 2,
+    sql: `
+      CREATE TABLE IF NOT EXISTS users (
+        id            INTEGER PRIMARY KEY AUTOINCREMENT,
+        telegram_id   INTEGER UNIQUE NOT NULL,
+        telegram_name TEXT,
+        phone         TEXT,
+        email         TEXT,
+        name          TEXT,
+        consent_at    INTEGER,
+        created_at    INTEGER NOT NULL DEFAULT (unixepoch())
+      );
+
+      CREATE TABLE IF NOT EXISTS bookings (
+        id                 INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id            INTEGER NOT NULL REFERENCES users(id),
+        calendar_event_id  TEXT NOT NULL,
+        booked_at          INTEGER NOT NULL DEFAULT (unixepoch()),
+        event_start        INTEGER NOT NULL,
+        event_end          INTEGER NOT NULL
+      );
+    `,
+  },
 ];
 
 export function runMigrations(db: Database.Database): void {

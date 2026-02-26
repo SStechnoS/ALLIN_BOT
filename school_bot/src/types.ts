@@ -1,18 +1,16 @@
 import { Context, Scenes } from 'telegraf';
 
 /**
- * Session data — extend this interface as features are added.
- * Keep it flat and serialisable (SQLite stores it as JSON).
+ * Bot session — Telegraf's scene session persisted in SQLite.
+ * Scene-specific data lives in ctx.scene.state (stored under __scenes).
+ * Add cross-scene persistent fields here only if needed across scene boundaries.
  */
-export interface SessionData extends Scenes.SceneSessionData {
-  // example: userId?: number;
-}
+export type BotSession = Scenes.SceneSession;
 
 /**
- * Unified bot context — pass this everywhere instead of bare telegraf Context.
- * Add services / middleware state here as the project grows.
+ * Unified bot context — use this everywhere instead of bare telegraf Context.
  */
 export interface BotContext extends Context {
-  session: Scenes.SceneSession<SessionData>;
-  scene: Scenes.SceneContextScene<BotContext, SessionData>;
+  session: BotSession;
+  scene: Scenes.SceneContextScene<BotContext, Scenes.SceneSessionData>;
 }

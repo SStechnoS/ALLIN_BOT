@@ -3,19 +3,19 @@ import { logger } from '../logger';
 import { config } from '../config';
 import type { BotContext } from '../types';
 import { buildSessionMiddleware } from './session';
+import { sendMainMenu } from './keyboards';
+import { onboardingScene, SCENE_ONBOARDING } from '../scenes/onboarding.scene';
+import { bookingScene, SCENE_BOOKING } from '../scenes/booking.scene';
+import { registerMenuHandlers } from '../handlers/menu.handler';
+import { getUserByTelegramId, getUserBooking } from '../services/user.service';
 
-/**
- * Factory — creates, configures and returns the bot instance.
- * Register new scenes / handlers here as features are added.
- */
 export function createBot(): Telegraf<BotContext> {
   const bot = new Telegraf<BotContext>(config.bot.token);
 
   // ── Middleware stack (order matters) ──────────────────────────────────────
   bot.use(buildSessionMiddleware());
 
-  // Scene manager — register scenes via stage.register(scene) as you add them
-  const stage = new Scenes.Stage<BotContext>([]);
+  const stage = new Scenes.Stage<BotContext>([onboardingScene, bookingScene]);
   bot.use(stage.middleware());
 
   // Global error handler
@@ -26,9 +26,34 @@ export function createBot(): Telegraf<BotContext> {
     });
   });
 
-  // ── Base commands ─────────────────────────────────────────────────────────
-  bot.start((ctx) => ctx.reply('Bot is running.'));
-  bot.help((ctx) => ctx.reply('Commands:\n/start — start\n/help — this message'));
+  // ── /start ────────────────────────────────────────────────────────────────
+  bot.start(async (ctx) => {
+    if (!ctx.from) return;
+
+    // Always leave any active scene before re-evaluating state
+    await ctx.scene.leave();
+
+    const user = getUserByTelegramId(ctx.from.id);
+
+    if (!user) {
+      return ctx.scene.enter(SCENE_ONBOARDING);
+    }
+
+    const booking = getUserBooking(user.id);
+
+    if (!booking) {
+      return ctx.scene.enter(SCENE_BOOKING);
+    }
+
+    // User is fully registered and has a booking — show main menu
+    await sendMainMenu(ctx, `С возвращением, ${user.name ?? ctx.from.first_name}!`);
+  });
+
+  bot.help((ctx) =>
+    ctx.reply('/start — начать\n/help — помощь'),
+  );
+
+  registerMenuHandlers(bot);
 
   return bot;
 }

@@ -1,8 +1,6 @@
 import { session, Scenes } from 'telegraf';
 import { getDb } from '../db/client';
-import type { SessionData, BotContext } from '../types';
-
-type StoreSession = Scenes.SceneSession<SessionData>;
+import type { BotSession, BotContext } from '../types';
 
 /**
  * SQLite-backed session store for Telegraf.
@@ -10,22 +8,24 @@ type StoreSession = Scenes.SceneSession<SessionData>;
  */
 function createSqliteStore() {
   return {
-    get(key: string): StoreSession | undefined {
+    get(key: string): BotSession | undefined {
       const db = getDb();
       const row = db
         .prepare<[string], { data: string }>('SELECT data FROM sessions WHERE key = ?')
         .get(key);
       if (!row) return undefined;
       try {
-        return JSON.parse(row.data) as StoreSession;
+        return JSON.parse(row.data) as BotSession;
       } catch {
         return undefined;
       }
     },
 
-    set(key: string, value: StoreSession): void {
+    set(key: string, value: BotSession): void {
       getDb()
-        .prepare('INSERT INTO sessions (key, data) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET data = excluded.data')
+        .prepare(
+          'INSERT INTO sessions (key, data) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET data = excluded.data',
+        )
         .run(key, JSON.stringify(value));
     },
 
@@ -36,5 +36,5 @@ function createSqliteStore() {
 }
 
 export function buildSessionMiddleware() {
-  return session<StoreSession, BotContext>({ store: createSqliteStore() });
+  return session<Scenes.SceneSession, BotContext>({ store: createSqliteStore() });
 }
