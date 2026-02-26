@@ -6,6 +6,7 @@ import {
   type CalendarSlot,
 } from '../services/calendar.service';
 import { getUserByTelegramId, createBooking } from '../services/user.service';
+import { createMeeting } from '../services/zoom.service';
 import { sendMainMenu } from '../bot/keyboards';
 import { logger } from '../logger';
 
@@ -162,9 +163,24 @@ bookingScene.action('booking_confirm', async (ctx) => {
     return ctx.scene.leave();
   }
 
+  // Create Zoom meeting for the selected slot
+  let zoomLink: string | undefined;
+  try {
+    const startIso = new Date(eventStart * 1000).toISOString();
+    const durationMinutes = Math.round((eventEnd - eventStart) / 60);
+    zoomLink = await createMeeting({
+      topic: `Пробный урок — ${user.name ?? ctx.from.first_name}`,
+      startTime: startIso,
+      durationMinutes: durationMinutes > 0 ? durationMinutes : 60,
+    });
+  } catch (err) {
+    logger.error('Zoom meeting creation failed', { err, eventId });
+    // Non-fatal: continue booking without Zoom link
+  }
+
   try {
     await bookSlot(eventId, user.name ?? ctx.from.first_name);
-    createBooking({ userId: user.id, calendarEventId: eventId, eventStart, eventEnd });
+    createBooking({ userId: user.id, calendarEventId: eventId, eventStart, eventEnd, zoomLink });
   } catch (err) {
     logger.error('Booking failed', { err, eventId });
     await ctx.answerCbQuery('Не удалось забронировать. Попробуйте ещё раз.');
@@ -173,11 +189,17 @@ bookingScene.action('booking_confirm', async (ctx) => {
 
   clearState(ctx);
 
+  const zoomLine = zoomLink ? `\n<b>Ссылка Zoom:</b> ${zoomLink}` : '';
+
   await ctx.editMessageText(
     `✅ Запись подтверждена!\n\n` +
-      `<b>День:</b> ${dayLabel}\n` +
-      `<b>Время:</b> ${timeLabel}\n\n` +
-      `Ждём вас!`,
+      `<b>Имя:</b> ${user.name ?? ctx.from.first_name}\n` +
+      (user.phone ? `<b>Телефон:</b> ${user.phone}\n` : '') +
+      (user.email ? `<b>Email:</b> ${user.email}\n` : '') +
+      `\n<b>День:</b> ${dayLabel}\n` +
+      `<b>Время:</b> ${timeLabel}` +
+      zoomLine +
+      `\n\nДо встречи!`,
     { parse_mode: 'HTML' },
   );
 

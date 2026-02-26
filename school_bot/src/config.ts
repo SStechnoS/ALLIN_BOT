@@ -29,6 +29,11 @@ export const config = {
     serviceAccountJson: requiredJson('GOOGLE_SERVICE_ACCOUNT_JSON'),
     sheetsId: process.env['GOOGLE_SHEETS_ID'] ?? '',
   },
+  zoom: {
+    accountId: required('ZOOM_ACCOUNT_ID'),
+    clientId: required('ZOOM_CLIENT_ID'),
+    clientSecret: required('ZOOM_CLIENT_SECRET'),
+  },
   privacyPolicyUrl: required('PRIVACY_POLICY_URL'),
   timezone: process.env['TIMEZONE'] ?? 'Europe/Moscow',
   env: (process.env['NODE_ENV'] ?? 'development') as 'development' | 'production',

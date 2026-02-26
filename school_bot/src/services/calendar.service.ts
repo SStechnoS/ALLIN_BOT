@@ -104,6 +104,18 @@ export async function getAvailableSlots(): Promise<
 }
 
 /**
+ * Reverts a booked event back to the available title so it shows up in getAvailableSlots() again.
+ */
+export async function cancelSlot(eventId: string): Promise<void> {
+  const calendar = getCalendarClient();
+  await calendar.events.patch({
+    calendarId: config.google.calendarId,
+    eventId,
+    requestBody: { summary: LESSON_TITLE },
+  });
+}
+
+/**
  * Marks a calendar event as booked by appending the user's name to the summary.
  * After this call, the event will no longer appear in getAvailableSlots().
  */

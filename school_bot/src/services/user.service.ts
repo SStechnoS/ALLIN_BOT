@@ -18,6 +18,7 @@ export interface BookingRow {
   booked_at: number;
   event_start: number;
   event_end: number;
+  zoom_link: string | null;
 }
 
 export interface CreateUserInput {
@@ -33,6 +34,7 @@ export interface CreateBookingInput {
   calendarEventId: string;
   eventStart: number;
   eventEnd: number;
+  zoomLink?: string;
 }
 
 export function getUserByTelegramId(telegramId: number): UserRow | undefined {
@@ -68,11 +70,15 @@ export function getUserBooking(userId: number): BookingRow | undefined {
     .get(userId);
 }
 
+export function deleteUserBooking(userId: number): void {
+  getDb().prepare('DELETE FROM bookings WHERE user_id = ?').run(userId);
+}
+
 export function createBooking(data: CreateBookingInput): void {
   getDb()
     .prepare(
-      `INSERT INTO bookings (user_id, calendar_event_id, event_start, event_end)
-       VALUES (?, ?, ?, ?)`,
+      `INSERT INTO bookings (user_id, calendar_event_id, event_start, event_end, zoom_link)
+       VALUES (?, ?, ?, ?, ?)`,
     )
-    .run(data.userId, data.calendarEventId, data.eventStart, data.eventEnd);
+    .run(data.userId, data.calendarEventId, data.eventStart, data.eventEnd, data.zoomLink ?? null);
 }
