@@ -48,10 +48,15 @@ export interface CreateMeetingOptions {
   durationMinutes: number;
 }
 
+export interface ZoomMeeting {
+  joinUrl: string;
+  meetingId: string;
+}
+
 /**
- * Creates a Zoom meeting and returns the join URL.
+ * Creates a Zoom meeting and returns the join URL and meeting ID.
  */
-export async function createMeeting(opts: CreateMeetingOptions): Promise<string> {
+export async function createMeeting(opts: CreateMeetingOptions): Promise<ZoomMeeting> {
   const token = await getAccessToken();
 
   const res = await fetch('https://api.zoom.us/v2/users/me/meetings', {
@@ -77,6 +82,6 @@ export async function createMeeting(opts: CreateMeetingOptions): Promise<string>
     throw new Error(`Zoom create meeting failed: ${res.status} ${body}`);
   }
 
-  const data = (await res.json()) as { join_url: string };
-  return data.join_url;
+  const data = (await res.json()) as { join_url: string; id: number };
+  return { joinUrl: data.join_url, meetingId: String(data.id) };
 }

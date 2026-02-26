@@ -7,6 +7,8 @@ import {
 } from '../services/calendar.service';
 import { getUserByTelegramId, createBooking } from '../services/user.service';
 import { createMeeting } from '../services/zoom.service';
+import { syncUserRow } from '../services/sheets.service';
+import { formatDay, formatTime } from '../utils/format';
 import { sendMainMenu } from '../bot/keyboards';
 import { logger } from '../logger';
 
@@ -165,14 +167,17 @@ bookingScene.action('booking_confirm', async (ctx) => {
 
   // Create Zoom meeting for the selected slot
   let zoomLink: string | undefined;
+  let zoomMeetingId: string | undefined;
   try {
     const startIso = new Date(eventStart * 1000).toISOString();
     const durationMinutes = Math.round((eventEnd - eventStart) / 60);
-    zoomLink = await createMeeting({
+    const meeting = await createMeeting({
       topic: `Пробный урок — ${user.name ?? ctx.from.first_name}`,
       startTime: startIso,
       durationMinutes: durationMinutes > 0 ? durationMinutes : 60,
     });
+    zoomLink = meeting.joinUrl;
+    zoomMeetingId = meeting.meetingId;
   } catch (err) {
     logger.error('Zoom meeting creation failed', { err, eventId });
     // Non-fatal: continue booking without Zoom link
@@ -180,11 +185,32 @@ bookingScene.action('booking_confirm', async (ctx) => {
 
   try {
     await bookSlot(eventId, user.name ?? ctx.from.first_name);
-    createBooking({ userId: user.id, calendarEventId: eventId, eventStart, eventEnd, zoomLink });
+    createBooking({ userId: user.id, calendarEventId: eventId, eventStart, eventEnd, zoomLink, zoomMeetingId });
   } catch (err) {
     logger.error('Booking failed', { err, eventId });
     await ctx.answerCbQuery('Не удалось забронировать. Попробуйте ещё раз.');
     return;
+  }
+
+  // Sync sheet row with booking data
+  if (user.sheets_row) {
+    const startDate = new Date(eventStart * 1000);
+    const now = Math.floor(Date.now() / 1000);
+    try {
+      await syncUserRow(user.sheets_row, {
+        lessonDate: formatDay(startDate),
+        lessonTime: formatTime(startDate),
+        lessonDatetime: startDate.toISOString(),
+        zoomLink,
+        zoomMeetingId,
+        confirmed: true,
+        confirmedAt: now,
+        calendarEventId: eventId,
+        status: 'booked',
+      });
+    } catch (err) {
+      logger.error('Sheet sync failed (booking confirm)', { err });
+    }
   }
 
   clearState(ctx);

@@ -35,7 +35,8 @@ export function createBot(): Telegraf<BotContext> {
 
     const user = getUserByTelegramId(ctx.from.id);
 
-    if (!user) {
+    // name is null until the user completes the full onboarding flow
+    if (!user || !user.name) {
       return ctx.scene.enter(SCENE_ONBOARDING);
     }
 

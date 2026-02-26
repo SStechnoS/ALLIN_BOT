@@ -43,6 +43,13 @@ const MIGRATIONS: { version: number; sql: string }[] = [
     version: 3,
     sql: `ALTER TABLE bookings ADD COLUMN zoom_link TEXT;`,
   },
+  {
+    version: 4,
+    sql: `
+      ALTER TABLE users ADD COLUMN sheets_row INTEGER;
+      ALTER TABLE bookings ADD COLUMN zoom_meeting_id TEXT;
+    `,
+  },
 ];
 
 export function runMigrations(db: Database.Database): void {

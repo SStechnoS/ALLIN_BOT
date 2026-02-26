@@ -1,4 +1,3 @@
-import { Markup } from 'telegraf';
 import type { Telegraf } from 'telegraf';
 import type { BotContext } from '../types';
 import {
@@ -7,12 +6,15 @@ import {
   deleteUserBooking,
 } from '../services/user.service';
 import { cancelSlot } from '../services/calendar.service';
+import { syncUserRow } from '../services/sheets.service';
 import { formatDay, formatTime } from '../utils/format';
-import { MAIN_MENU_BTN } from '../bot/keyboards';
+import { MAIN_MENU_BTN, RESCHEDULE_BTN } from '../bot/keyboards';
 import { SCENE_BOOKING } from '../scenes/booking.scene';
 import { logger } from '../logger';
 
 export function registerMenuHandlers(bot: Telegraf<BotContext>): void {
+  // ── View booking ──────────────────────────────────────────────────────────
+
   bot.hears(MAIN_MENU_BTN, async (ctx) => {
     if (!ctx.from) return;
 
@@ -30,7 +32,6 @@ export function registerMenuHandlers(bot: Telegraf<BotContext>): void {
 
     const start = new Date(booking.event_start * 1000);
     const end = new Date(booking.event_end * 1000);
-
     const zoomLine = booking.zoom_link ? `\n<b>Ссылка Zoom:</b> ${booking.zoom_link}` : '';
 
     await ctx.reply(
@@ -41,25 +42,24 @@ export function registerMenuHandlers(bot: Telegraf<BotContext>): void {
         `\n<b>День:</b> ${formatDay(start)}\n` +
         `<b>Время:</b> ${formatTime(start)} — ${formatTime(end)}` +
         zoomLine,
-      {
-        parse_mode: 'HTML',
-        ...Markup.inlineKeyboard([
-          [Markup.button.callback('🔄 Перенести запись', 'reschedule_booking')],
-        ]),
-      },
+      { parse_mode: 'HTML' },
     );
   });
 
-  bot.action('reschedule_booking', async (ctx) => {
-    await ctx.answerCbQuery();
+  // ── Reschedule ────────────────────────────────────────────────────────────
+
+  bot.hears(RESCHEDULE_BTN, async (ctx) => {
     if (!ctx.from) return;
 
     const user = getUserByTelegramId(ctx.from.id);
-    if (!user) return;
+    if (!user) {
+      await ctx.reply('Вы не зарегистрированы. Нажмите /start для начала.');
+      return;
+    }
 
     const booking = getUserBooking(user.id);
     if (!booking) {
-      await ctx.editMessageText('У вас нет активных записей.');
+      await ctx.reply('У вас нет активных записей для переноса.');
       return;
     }
 
@@ -73,7 +73,25 @@ export function registerMenuHandlers(bot: Telegraf<BotContext>): void {
 
     deleteUserBooking(user.id);
 
-    await ctx.editMessageText('Запись отменена. Выберите новое удобное время:');
+    // Sync sheet: clear lesson data, set status to rescheduling
+    if (user.sheets_row) {
+      try {
+        await syncUserRow(user.sheets_row, {
+          lessonDate: '',
+          lessonTime: '',
+          lessonDatetime: '',
+          zoomLink: '',
+          zoomMeetingId: '',
+          confirmed: false,
+          calendarEventId: '',
+          status: 'rescheduling',
+        });
+      } catch (err) {
+        logger.error('Sheet sync failed (reschedule)', { err });
+      }
+    }
+
+    await ctx.reply('Запись отменена. Выберите новое удобное время:');
     return ctx.scene.enter(SCENE_BOOKING);
   });
 }

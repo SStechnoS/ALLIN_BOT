@@ -19,7 +19,7 @@ function getCalendarClient() {
     [key: string]: unknown;
   };
 
-  console.log("credentials :>> ", credentials);
+  // console.log("credentials :>> ", credentials);
 
   // dotenv reads \n as two literal chars; JSON.parse keeps them as-is in some
   // environments. Normalise to actual newlines so the RSA signing works correctly.
@@ -48,7 +48,7 @@ export async function getAvailableSlots(): Promise<
   const until = new Date();
   until.setDate(until.getDate() + 30);
 
-  console.log("config.google.calendarId :>> ", config.google.calendarId);
+  // console.log("config.google.calendarId :>> ", config.google.calendarId);
 
   const response = await calendar.events.list({
     calendarId: config.google.calendarId,
@@ -58,7 +58,7 @@ export async function getAvailableSlots(): Promise<
     orderBy: "startTime",
   });
 
-  console.log("response :>> ", JSON.stringify(response.data, null, 2));
+  // console.log("response :>> ", JSON.stringify(response.data, null, 2));
 
   const events = response.data.items ?? [];
 
@@ -69,12 +69,12 @@ export async function getAvailableSlots(): Promise<
     if (!event.id || !event.start?.dateTime) continue;
 
     const summary = event.summary?.trim() ?? "";
-    console.log("summary :>> ", summary);
-    // Exact match only — booked events have "Пробные уроки - Name" suffix
-    console.log(
-      "summary.toLowerCase() !== LESSON_TITLE.toLowerCase() :>> ",
-      summary.toLowerCase() !== LESSON_TITLE.toLowerCase(),
-    );
+    // console.log("summary :>> ", summary);
+    // // Exact match only — booked events have "Пробные уроки - Name" suffix
+    // console.log(
+    //   "summary.toLowerCase() !== LESSON_TITLE.toLowerCase() :>> ",
+    //   summary.toLowerCase() !== LESSON_TITLE.toLowerCase(),
+    // );
     if (summary.toLowerCase() !== LESSON_TITLE.toLowerCase()) continue;
 
     const start = new Date(event.start.dateTime);
