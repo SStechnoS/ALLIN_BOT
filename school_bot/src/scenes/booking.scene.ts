@@ -8,6 +8,7 @@ import {
 import { getUserByTelegramId, createBooking } from '../services/user.service';
 import { createMeeting } from '../services/zoom.service';
 import { cancelNudges, scheduleLessonReminders } from '../jobs/notifications';
+import { notifyAdmins } from '../admin/notifications';
 import { syncUserRow } from '../services/sheets.service';
 import { formatDay, formatTime } from '../utils/format';
 import { sendMainMenu } from '../bot/keyboards';
@@ -203,6 +204,19 @@ bookingScene.action('booking_confirm', async (ctx) => {
     timeLabel,
     zoomLink ?? '',
   );
+
+  // Notify admins about the new booking (fire-and-forget)
+  const tgHandle = user.telegram_name ? `@${user.telegram_name}` : String(ctx.from.id);
+  notifyAdmins(
+    `📅 <b>Новая запись!</b>\n\n` +
+      `<b>Имя:</b> ${user.name ?? ctx.from.first_name}\n` +
+      `<b>Телефон:</b> ${user.phone ?? '—'}\n` +
+      `<b>Email:</b> ${user.email ?? '—'}\n` +
+      `<b>Telegram:</b> ${tgHandle}\n\n` +
+      `<b>День:</b> ${dayLabel}\n` +
+      `<b>Время:</b> ${timeLabel}` +
+      (zoomLink ? `\n<b>Zoom:</b> ${zoomLink}` : ''),
+  ).catch((err) => logger.error('Admin booking notification failed', { err }));
 
   // Sync sheet row with booking data
   if (user.sheets_row) {

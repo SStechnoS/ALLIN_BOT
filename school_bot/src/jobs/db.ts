@@ -1,6 +1,6 @@
 import { getDb } from '../db/client';
 
-export type JobType = 'nudge' | 'remind_24h' | 'remind_5h' | 'remind_30min';
+export type JobType = 'nudge' | 'remind_24h' | 'remind_5h' | 'remind_30min' | 'admin_alert_4h';
 
 export interface JobRow {
   id: number;

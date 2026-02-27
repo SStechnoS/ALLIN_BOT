@@ -2,6 +2,7 @@ import { Markup, type Telegraf } from "telegraf";
 import type { BotContext } from "../types";
 import { getDueJobs, markJobSent, type JobRow } from "./db";
 import { getUserByTelegramId, getUserBooking } from "../services/user.service";
+import { notifyAdmins } from "../admin/notifications";
 import { config } from "../config";
 import { logger } from "../logger";
 
@@ -133,6 +134,28 @@ async function handleJob(
         zoomLine +
         `\n\nДо встречи! 👋`,
       { parse_mode: "HTML" },
+    );
+    return;
+  }
+
+  // ── Admin alert: client didn't confirm 4h before lesson ───────────────────
+  if (job.type === "admin_alert_4h") {
+    if (lp.eventStart < now) return; // lesson already started/passed
+    if (booking.lesson_confirmed_at) return; // confirmed — no alert needed
+
+    const tg = user.telegram_name
+      ? `@${user.telegram_name}`
+      : `<a href="tg://user?id=${user.telegram_id}">${user.name ?? user.telegram_id}</a>`;
+
+    await notifyAdmins(
+      `⚠️ <b>Клиент не подтвердил урок!</b>\n\n` +
+        `<b>Имя:</b> ${user.name ?? "—"}\n` +
+        `<b>Телефон:</b> ${user.phone ?? "—"}\n` +
+        `<b>Email:</b> ${user.email ?? "—"}\n` +
+        `<b>Telegram:</b> ${tg}\n\n` +
+        `<b>День:</b> ${lp.dayLabel}\n` +
+        `<b>Время:</b> ${lp.timeLabel}\n` +
+        `До начала урока ~4 часа.`,
     );
     return;
   }

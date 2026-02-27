@@ -21,6 +21,10 @@ export const config = {
   bot: {
     token: required('BOT_TOKEN'),
   },
+  adminBot: {
+    token: process.env['ADMIN_BOT_TOKEN'] ?? '',
+    password: process.env['ADMIN_BOT_PASSWORD'] ?? '',
+  },
   db: {
     path: path.resolve(process.env['DB_PATH'] ?? './data/bot.db'),
   },
@@ -34,6 +38,7 @@ export const config = {
     clientId: required('ZOOM_CLIENT_ID'),
     clientSecret: required('ZOOM_CLIENT_SECRET'),
   },
+  welcomeVideoNoteId: process.env['WELCOME_VIDEO_NOTE_ID'] ?? '',
   privacyPolicyUrl: required('PRIVACY_POLICY_URL'),
   timezone: process.env['TIMEZONE'] ?? 'Europe/Moscow',
   env: (process.env['NODE_ENV'] ?? 'development') as 'development' | 'production',

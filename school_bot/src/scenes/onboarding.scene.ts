@@ -1,6 +1,7 @@
 import { Scenes, Markup } from 'telegraf';
 import type { BotContext } from '../types';
 import { config } from '../config';
+import { getBotMessage } from '../services/bot-messages.service';
 import { createOrGetUser, finalizeUser, updateUserSheetsRow } from '../services/user.service';
 import { appendUserRow, syncUserRow } from '../services/sheets.service';
 import { scheduleNudges } from '../jobs/notifications';
@@ -80,10 +81,19 @@ onboardingScene.enter(async (ctx) => {
     }
   }
 
+  const welcomeText = getBotMessage('welcome_text');
+  const videoNoteId = getBotMessage('welcome_video_note_id');
+
+  if (videoNoteId && ctx.chat) {
+    try {
+      await ctx.telegram.sendVideoNote(ctx.chat.id, videoNoteId);
+    } catch (err) {
+      logger.error('Failed to send welcome video note', { err });
+    }
+  }
+
   await ctx.reply(
-    'Добро пожаловать!\n\n' +
-      'Для записи на пробный урок нам необходимо сохранить ваши данные. ' +
-      'Нажимая «Подтвердить», вы соглашаетесь с нашей политикой конфиденциальности.',
+    welcomeText,
     Markup.inlineKeyboard([
       [Markup.button.callback('✅ Подтвердить', 'onboarding_consent')],
       [Markup.button.url('📄 Политика конфиденциальности', config.privacyPolicyUrl)],

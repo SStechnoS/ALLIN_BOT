@@ -9,6 +9,7 @@ import { bookingScene, SCENE_BOOKING } from '../scenes/booking.scene';
 import { registerMenuHandlers } from '../handlers/menu.handler';
 import { getUserByTelegramId, getUserBooking, confirmLesson } from '../services/user.service';
 import { startScheduler } from '../jobs/scheduler';
+import { initClientTelegram } from './telegram';
 
 export function createBot(): Telegraf<BotContext> {
   const bot = new Telegraf<BotContext>(config.bot.token);
@@ -70,6 +71,7 @@ export function createBot(): Telegraf<BotContext> {
   // ── Noop (placeholder buttons that do nothing) ────────────────────────────
   bot.action('noop', (ctx) => ctx.answerCbQuery());
 
+  initClientTelegram(bot.telegram);
   startScheduler(bot);
 
   return bot;

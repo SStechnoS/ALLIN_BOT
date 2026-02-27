@@ -2,7 +2,7 @@ import { insertJob, cancelJobsByTypes, type JobType } from "./db";
 import { config } from "../config";
 
 const NUDGE_DELAYS_S = [1 * 3600, 24 * 3600, 36 * 3600]; // 1h, 24h, 36h
-const LESSON_JOB_TYPES: JobType[] = ["remind_24h", "remind_5h", "remind_30min"];
+const LESSON_JOB_TYPES: JobType[] = ["remind_24h", "remind_5h", "remind_30min", "admin_alert_4h"];
 
 // ── Timezone helpers ─────────────────────────────────────────────────────────
 
@@ -112,6 +112,7 @@ export function scheduleLessonReminders(
     ["remind_24h", eventStart - 24 * 3600],
     ["remind_5h", eventStart - 5 * 3600],
     ["remind_30min", eventStart - 30 * 60],
+    ["admin_alert_4h", eventStart - 4 * 3600],
   ];
 
   for (const [type, rawAt] of reminders) {

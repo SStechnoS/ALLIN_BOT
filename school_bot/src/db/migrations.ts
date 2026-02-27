@@ -70,6 +70,37 @@ const MIGRATIONS: { version: number; sql: string }[] = [
         WHERE sent_at IS NULL AND cancelled_at IS NULL;
     `,
   },
+  {
+    version: 6,
+    sql: `
+      CREATE TABLE IF NOT EXISTS admins (
+        id          INTEGER PRIMARY KEY AUTOINCREMENT,
+        telegram_id INTEGER UNIQUE NOT NULL,
+        telegram_name TEXT,
+        created_at  INTEGER NOT NULL DEFAULT (unixepoch())
+      );
+
+      CREATE TABLE IF NOT EXISTS sessions_admin (
+        key   TEXT PRIMARY KEY,
+        data  TEXT NOT NULL DEFAULT '{}'
+      );
+    `,
+  },
+  {
+    version: 7,
+    sql: `
+      ALTER TABLE bookings ADD COLUMN attended INTEGER;
+
+      CREATE TABLE IF NOT EXISTS bot_messages (
+        key   TEXT PRIMARY KEY,
+        value TEXT NOT NULL DEFAULT ''
+      );
+
+      INSERT OR IGNORE INTO bot_messages (key, value) VALUES
+        ('welcome_text', 'Добро пожаловать!\n\nДля записи на пробный урок нам необходимо сохранить ваши данные. Нажимая «Подтвердить», вы соглашаетесь с нашей политикой конфиденциальности.'),
+        ('welcome_video_note_id', '');
+    `,
+  },
 ];
 
 export function runMigrations(db: Database.Database): void {
