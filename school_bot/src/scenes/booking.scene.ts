@@ -1,23 +1,31 @@
-import { Scenes, Markup } from 'telegraf';
-import type { BotContext } from '../types';
+import { Scenes, Markup } from "telegraf";
+import type { BotContext } from "../types";
 import {
   getAvailableSlots,
   bookSlot,
   type CalendarSlot,
-} from '../services/calendar.service';
-import { getUserByTelegramId, createBooking } from '../services/user.service';
-import { createMeeting } from '../services/zoom.service';
-import { cancelNudges, scheduleLessonReminders } from '../jobs/notifications';
-import { notifyAdmins } from '../admin/notifications';
-import { syncUserRow } from '../services/sheets.service';
-import { formatDay, formatTime } from '../utils/format';
-import { sendMainMenu } from '../bot/keyboards';
-import { logger } from '../logger';
+} from "../services/calendar.service";
+import {
+  getUserByTelegramId,
+  createBooking,
+  getUserBooking,
+} from "../services/user.service";
+import { createMeeting } from "../services/zoom.service";
+import { cancelNudges, scheduleLessonReminders } from "../jobs/notifications";
+import { notifyAdmins } from "../admin/notifications";
+import { syncUserRow } from "../services/sheets.service";
+import { formatDay, formatTime, formatMonthLabel } from "../utils/format";
+import { sendMainMenu } from "../bot/keyboards";
+import { logger } from "../logger";
+import { SCENE_ONBOARDING } from "./onboarding.scene";
+import { getBotMessage } from "../services/bot-messages.service";
 
-export const SCENE_BOOKING = 'booking';
+export const SCENE_BOOKING = "booking";
 
 /** Scene-local state stored in ctx.scene.state (persisted under __scenes in SQLite). */
 interface BookingState {
+  monthPage?: number; // current page in month picker (0-based)
+  monthKey?: string; // selected month "YYYY-MM"
   dayKey?: string;
   dayLabel?: string;
   slots?: Record<string, string>; // index → Google Calendar eventId
@@ -43,7 +51,23 @@ export const bookingScene = new Scenes.BaseScene<BotContext>(SCENE_BOOKING);
 
 bookingScene.enter(async (ctx) => {
   clearState(ctx);
-  await showDaySelection(ctx);
+  await showMonthSelection(ctx, 0);
+});
+
+// ── Month selected ─────────────────────────────────────────────────────────
+
+bookingScene.action(/^booking_month_(\d{4}-\d{2})$/, async (ctx) => {
+  await ctx.answerCbQuery();
+  const monthKey = ctx.match![1]!;
+  await showDaySelectionForMonth(ctx, monthKey);
+});
+
+// ── Month page navigation ──────────────────────────────────────────────────
+
+bookingScene.action(/^booking_mpage_(\d+)$/, async (ctx) => {
+  await ctx.answerCbQuery();
+  const page = parseInt(ctx.match![1]!, 10);
+  await showMonthSelection(ctx, page);
 });
 
 // ── Day selected ───────────────────────────────────────────────────────────
@@ -57,14 +81,19 @@ bookingScene.action(/^booking_day_(.+)$/, async (ctx) => {
   try {
     slots = await getAvailableSlots();
   } catch (err) {
-    logger.error('Calendar fetch failed', { err });
-    await ctx.answerCbQuery('Ошибка загрузки расписания. Попробуйте позже.');
+    logger.error("Calendar fetch failed", { err });
+    await ctx.answerCbQuery("Ошибка загрузки расписания. Попробуйте позже.");
     return;
   }
 
   const daySlots = slots.get(dayKey);
   if (!daySlots || daySlots.length === 0) {
-    await showDaySelection(ctx);
+    const { monthKey, monthPage } = s(ctx);
+    if (monthKey) {
+      await showDaySelectionForMonth(ctx, monthKey);
+    } else {
+      await showMonthSelection(ctx, monthPage ?? 0);
+    }
     return;
   }
 
@@ -86,9 +115,9 @@ bookingScene.action(/^booking_day_(.+)$/, async (ctx) => {
     {
       ...Markup.inlineKeyboard([
         ...timeButtons,
-        [Markup.button.callback('← Назад', 'booking_back_days')],
+        [Markup.button.callback("← Назад", "booking_back_days")],
       ]),
-      parse_mode: 'HTML',
+      parse_mode: "HTML",
     },
   );
 });
@@ -103,7 +132,7 @@ bookingScene.action(/^booking_time_(\d+)$/, async (ctx) => {
   const state = s(ctx);
   const eventId = state.slots?.[idx];
   if (!eventId) {
-    await ctx.answerCbQuery('Слот недоступен, выберите другое время.');
+    await ctx.answerCbQuery("Слот недоступен, выберите другое время.");
     return;
   }
 
@@ -111,7 +140,7 @@ bookingScene.action(/^booking_time_(\d+)$/, async (ctx) => {
   try {
     slots = await getAvailableSlots();
   } catch (err) {
-    logger.error('Calendar fetch failed', { err });
+    logger.error("Calendar fetch failed", { err });
     return;
   }
 
@@ -139,31 +168,37 @@ bookingScene.action(/^booking_time_(\d+)$/, async (ctx) => {
       `Подтвердите запись:`,
     {
       ...Markup.inlineKeyboard([
-        [Markup.button.callback('✅ Подтвердить', 'booking_confirm')],
-        [Markup.button.callback('← Назад', 'booking_back_times')],
+        [Markup.button.callback("✅ Подтвердить", "booking_confirm")],
+        [Markup.button.callback("← Назад", "booking_back_times")],
       ]),
-      parse_mode: 'HTML',
+      parse_mode: "HTML",
     },
   );
 });
 
 // ── Confirm booking ────────────────────────────────────────────────────────
 
-bookingScene.action('booking_confirm', async (ctx) => {
+bookingScene.action("booking_confirm", async (ctx) => {
   await ctx.answerCbQuery();
   if (!ctx.from) return;
 
   const state = s(ctx);
-  const { eventId, dayLabel = '', timeLabel = '', eventStart, eventEnd } = state;
+  const {
+    eventId,
+    dayLabel = "",
+    timeLabel = "",
+    eventStart,
+    eventEnd,
+  } = state;
 
   if (!eventId || !eventStart || !eventEnd) {
-    await ctx.reply('Произошла ошибка. Начните выбор заново.');
+    await ctx.reply("Произошла ошибка. Начните выбор заново.");
     return ctx.scene.reenter();
   }
 
   const user = getUserByTelegramId(ctx.from.id);
   if (!user) {
-    await ctx.reply('Пользователь не найден. Нажмите /start');
+    await ctx.reply("Пользователь не найден. Нажмите /start");
     return ctx.scene.leave();
   }
 
@@ -181,16 +216,23 @@ bookingScene.action('booking_confirm', async (ctx) => {
     zoomLink = meeting.joinUrl;
     zoomMeetingId = meeting.meetingId;
   } catch (err) {
-    logger.error('Zoom meeting creation failed', { err, eventId });
+    logger.error("Zoom meeting creation failed", { err, eventId });
     // Non-fatal: continue booking without Zoom link
   }
 
   try {
     await bookSlot(eventId, user.name ?? ctx.from.first_name);
-    createBooking({ userId: user.id, calendarEventId: eventId, eventStart, eventEnd, zoomLink, zoomMeetingId });
+    createBooking({
+      userId: user.id,
+      calendarEventId: eventId,
+      eventStart,
+      eventEnd,
+      zoomLink,
+      zoomMeetingId,
+    });
   } catch (err) {
-    logger.error('Booking failed', { err, eventId });
-    await ctx.answerCbQuery('Не удалось забронировать. Попробуйте ещё раз.');
+    logger.error("Booking failed", { err, eventId });
+    await ctx.answerCbQuery("Не удалось забронировать. Попробуйте ещё раз.");
     return;
   }
 
@@ -202,21 +244,23 @@ bookingScene.action('booking_confirm', async (ctx) => {
     eventId,
     dayLabel,
     timeLabel,
-    zoomLink ?? '',
+    zoomLink ?? "",
   );
 
   // Notify admins about the new booking (fire-and-forget)
-  const tgHandle = user.telegram_name ? `@${user.telegram_name}` : String(ctx.from.id);
+  const tgHandle = user.telegram_name
+    ? `@${user.telegram_name}`
+    : String(ctx.from.id);
   notifyAdmins(
     `📅 <b>Новая запись!</b>\n\n` +
       `<b>Имя:</b> ${user.name ?? ctx.from.first_name}\n` +
-      `<b>Телефон:</b> ${user.phone ?? '—'}\n` +
-      `<b>Email:</b> ${user.email ?? '—'}\n` +
+      `<b>Телефон:</b> ${user.phone ?? "—"}\n` +
+      `<b>Email:</b> ${user.email ?? "—"}\n` +
       `<b>Telegram:</b> ${tgHandle}\n\n` +
       `<b>День:</b> ${dayLabel}\n` +
       `<b>Время:</b> ${timeLabel}` +
-      (zoomLink ? `\n<b>Zoom:</b> ${zoomLink}` : ''),
-  ).catch((err) => logger.error('Admin booking notification failed', { err }));
+      (zoomLink ? `\n<b>Zoom:</b> ${zoomLink}` : ""),
+  ).catch((err) => logger.error("Admin booking notification failed", { err }));
 
   // Sync sheet row with booking data
   if (user.sheets_row) {
@@ -232,95 +276,243 @@ bookingScene.action('booking_confirm', async (ctx) => {
         confirmed: true,
         confirmedAt: now,
         calendarEventId: eventId,
-        status: 'booked',
+        status: "booked",
       });
     } catch (err) {
-      logger.error('Sheet sync failed (booking confirm)', { err });
+      logger.error("Sheet sync failed (booking confirm)", { err });
     }
   }
 
   clearState(ctx);
 
-  const zoomLine = zoomLink ? `\n<b>Ссылка Zoom:</b> ${zoomLink}` : '';
+  const zoomLine = zoomLink ? `\n<b>Ссылка Zoom:</b> ${zoomLink}` : "";
 
   await ctx.editMessageText(
     `✅ Запись подтверждена!\n\n` +
       `<b>Имя:</b> ${user.name ?? ctx.from.first_name}\n` +
-      (user.phone ? `<b>Телефон:</b> ${user.phone}\n` : '') +
-      (user.email ? `<b>Email:</b> ${user.email}\n` : '') +
+      (user.phone ? `<b>Телефон:</b> ${user.phone}\n` : "") +
+      (user.email ? `<b>Email:</b> ${user.email}\n` : "") +
       `\n<b>День:</b> ${dayLabel}\n` +
       `<b>Время:</b> ${timeLabel}` +
       zoomLine +
       `\n\nДо встречи!`,
-    { parse_mode: 'HTML' },
+    { parse_mode: "HTML" },
   );
 
-  await sendMainMenu(ctx, 'Вы можете просмотреть свою запись:');
+  await sendMainMenu(ctx, "Вы можете просмотреть свою запись:");
   return ctx.scene.leave();
 });
 
 // ── Back buttons ───────────────────────────────────────────────────────────
 
-bookingScene.action('booking_back_days', async (ctx) => {
+bookingScene.action("booking_back_months", async (ctx) => {
   await ctx.answerCbQuery();
-  clearState(ctx);
-  await showDaySelection(ctx);
+  const page = s(ctx).monthPage ?? 0;
+  ctx.scene.state = { monthPage: page };
+  await showMonthSelection(ctx, page);
 });
 
-bookingScene.action('booking_back_times', async (ctx) => {
+bookingScene.action("booking_back_days", async (ctx) => {
   await ctx.answerCbQuery();
-  const { dayKey } = s(ctx);
-  ctx.scene.state = { ...s(ctx), eventId: undefined, timeLabel: undefined, eventStart: undefined, eventEnd: undefined };
+  const { monthKey, monthPage } = s(ctx);
+  ctx.scene.state = { monthKey, monthPage };
+  if (monthKey) {
+    await showDaySelectionForMonth(ctx, monthKey);
+  } else {
+    await showMonthSelection(ctx, monthPage ?? 0);
+  }
+});
 
-  if (!dayKey) return showDaySelection(ctx);
+bookingScene.action("booking_back_times", async (ctx) => {
+  await ctx.answerCbQuery();
+  const { dayKey, monthKey, monthPage } = s(ctx);
+  ctx.scene.state = {
+    ...s(ctx),
+    eventId: undefined,
+    timeLabel: undefined,
+    eventStart: undefined,
+    eventEnd: undefined,
+  };
+
+  if (!dayKey) {
+    if (monthKey) return showDaySelectionForMonth(ctx, monthKey);
+    return showMonthSelection(ctx, monthPage ?? 0);
+  }
 
   let slots: Map<string, CalendarSlot[]>;
   try {
     slots = await getAvailableSlots();
   } catch {
-    return showDaySelection(ctx);
+    if (monthKey) return showDaySelectionForMonth(ctx, monthKey);
+    return showMonthSelection(ctx, monthPage ?? 0);
   }
 
   return showTimeSelection(ctx, dayKey, slots);
 });
 
+// ── /start inside booking scene ────────────────────────────────────────────
+
+bookingScene.command("start", async (ctx) => {
+  if (!ctx.from) return;
+
+  // Выходим из текущей сцены и пересобираем состояние так же, как в глобальном /start
+  await ctx.scene.leave();
+
+  const user = getUserByTelegramId(ctx.from.id);
+
+  // Пользователь ещё не завершил онбординг — отправляем в onboarding
+  if (!user || !user.name) {
+    return ctx.scene.enter(SCENE_ONBOARDING);
+  }
+
+  const booking = getUserBooking(user.id);
+
+  const welcomeText = getBotMessage("welcome_text");
+
+  // Нет бронирования — сразу переходим к выбору времени
+  if (!booking) {
+    await ctx.reply(welcomeText);
+    return ctx.scene.enter(SCENE_BOOKING);
+  }
+
+  // Есть бронирование — показываем главное меню
+  await sendMainMenu(
+    ctx,
+    `С возвращением, ${user.name ?? ctx.from.first_name}!`,
+  );
+});
+
 // ── Ignore unexpected text input ───────────────────────────────────────────
 
-bookingScene.on('message', async (ctx) => {
-  await ctx.reply('Пожалуйста, используйте кнопки для выбора.');
+bookingScene.on("message", async (ctx) => {
+  await ctx.reply(
+    "Сейчас мы выбираем время для урока. Пожалуйста, используйте кнопки под сообщением.\n\n" +
+      "Чтобы начать заново из любого места, просто отправьте команду /start.",
+  );
 });
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
-async function showDaySelection(ctx: BotContext): Promise<void> {
+const MONTHS_PER_PAGE = 6;
+
+async function showMonthSelection(
+  ctx: BotContext,
+  page: number,
+): Promise<void> {
   let slots: Map<string, CalendarSlot[]>;
   try {
     slots = await getAvailableSlots();
   } catch (err) {
-    logger.error('Calendar fetch failed on showDaySelection', { err });
-    const msg = 'Не удалось загрузить расписание. Попробуйте позже.';
+    logger.error("Calendar fetch failed on showMonthSelection", { err });
+    const msg = "Не удалось загрузить расписание. Попробуйте позже.";
     ctx.callbackQuery ? await ctx.editMessageText(msg) : await ctx.reply(msg);
     await ctx.scene.leave();
     return;
   }
 
   if (slots.size === 0) {
-    const msg = 'К сожалению, свободных слотов нет. Попробуйте позже.';
+    const msg = "К сожалению, свободных слотов нет. Попробуйте позже.";
     ctx.callbackQuery ? await ctx.editMessageText(msg) : await ctx.reply(msg);
     await ctx.scene.leave();
     return;
   }
 
-  const buttons = Array.from(slots.entries()).map(([dayKey, daySlots]) => [
+  // Collect unique months in sorted order
+  const monthsSet = new Set<string>();
+  for (const dayKey of slots.keys()) {
+    monthsSet.add(dayKey.substring(0, 7)); // "YYYY-MM"
+  }
+  const months = Array.from(monthsSet).sort();
+
+  const totalPages = Math.ceil(months.length / MONTHS_PER_PAGE);
+  const safePage = Math.max(0, Math.min(page, totalPages - 1));
+  const pageMonths = months.slice(
+    safePage * MONTHS_PER_PAGE,
+    (safePage + 1) * MONTHS_PER_PAGE,
+  );
+
+  // Two-column layout
+  const rows: ReturnType<typeof Markup.button.callback>[][] = [];
+  for (let i = 0; i < pageMonths.length; i += 2) {
+    const row: ReturnType<typeof Markup.button.callback>[] = [
+      Markup.button.callback(
+        formatMonthLabel(pageMonths[i]!),
+        `booking_month_${pageMonths[i]}`,
+      ),
+    ];
+    if (pageMonths[i + 1]) {
+      row.push(
+        Markup.button.callback(
+          formatMonthLabel(pageMonths[i + 1]!),
+          `booking_month_${pageMonths[i + 1]}`,
+        ),
+      );
+    }
+    rows.push(row);
+  }
+
+  // Page navigation if needed
+  if (totalPages > 1) {
+    const navRow: ReturnType<typeof Markup.button.callback>[] = [];
+    if (safePage > 0)
+      navRow.push(
+        Markup.button.callback("← Назад", `booking_mpage_${safePage - 1}`),
+      );
+    if (safePage < totalPages - 1)
+      navRow.push(
+        Markup.button.callback("Вперёд →", `booking_mpage_${safePage + 1}`),
+      );
+    rows.push(navRow);
+  }
+
+  ctx.scene.state = { ...s(ctx), monthPage: safePage };
+
+  const text = "Выберите месяц для пробного урока:";
+  ctx.callbackQuery
+    ? await ctx.editMessageText(text, Markup.inlineKeyboard(rows))
+    : await ctx.reply(text, Markup.inlineKeyboard(rows));
+}
+
+async function showDaySelectionForMonth(
+  ctx: BotContext,
+  monthKey: string,
+): Promise<void> {
+  let slots: Map<string, CalendarSlot[]>;
+  try {
+    slots = await getAvailableSlots();
+  } catch (err) {
+    logger.error("Calendar fetch failed on showDaySelectionForMonth", { err });
+    const msg = "Не удалось загрузить расписание. Попробуйте позже.";
+    ctx.callbackQuery ? await ctx.editMessageText(msg) : await ctx.reply(msg);
+    await ctx.scene.leave();
+    return;
+  }
+
+  const monthDays = Array.from(slots.entries()).filter(([dayKey]) =>
+    dayKey.startsWith(monthKey),
+  );
+  if (monthDays.length === 0) {
+    await showMonthSelection(ctx, s(ctx).monthPage ?? 0);
+    return;
+  }
+
+  const buttons = monthDays.map(([dayKey, daySlots]) => [
     Markup.button.callback(daySlots[0]!.dayLabel, `booking_day_${dayKey}`),
   ]);
+  buttons.push([Markup.button.callback("← Назад", "booking_back_months")]);
 
-  const text = 'Выберите удобный день для пробного урока:';
-  const keyboard = Markup.inlineKeyboard(buttons);
+  ctx.scene.state = { ...s(ctx), monthKey };
 
+  const text = `Выберите день:\n<b>${formatMonthLabel(monthKey)}</b>`;
   ctx.callbackQuery
-    ? await ctx.editMessageText(text, keyboard)
-    : await ctx.reply(text, keyboard);
+    ? await ctx.editMessageText(text, {
+        ...Markup.inlineKeyboard(buttons),
+        parse_mode: "HTML",
+      })
+    : await ctx.reply(text, {
+        ...Markup.inlineKeyboard(buttons),
+        parse_mode: "HTML",
+      });
 }
 
 async function showTimeSelection(
@@ -330,7 +522,9 @@ async function showTimeSelection(
 ): Promise<void> {
   const daySlots = slots.get(dayKey);
   if (!daySlots || daySlots.length === 0) {
-    return showDaySelection(ctx);
+    const { monthKey, monthPage } = s(ctx);
+    if (monthKey) return showDaySelectionForMonth(ctx, monthKey);
+    return showMonthSelection(ctx, monthPage ?? 0);
   }
 
   const slotMap: Record<string, string> = {};
@@ -339,16 +533,20 @@ async function showTimeSelection(
     return [Markup.button.callback(slot.timeLabel, `booking_time_${i}`)];
   });
 
-  ctx.scene.state = { ...s(ctx), slots: slotMap, dayLabel: daySlots[0]!.dayLabel };
+  ctx.scene.state = {
+    ...s(ctx),
+    slots: slotMap,
+    dayLabel: daySlots[0]!.dayLabel,
+  };
 
   await ctx.editMessageText(
     `Выберите удобное время:\n<b>${daySlots[0]!.dayLabel}</b>`,
     {
       ...Markup.inlineKeyboard([
         ...timeButtons,
-        [Markup.button.callback('← Назад', 'booking_back_days')],
+        [Markup.button.callback("← Назад", "booking_back_days")],
       ]),
-      parse_mode: 'HTML',
+      parse_mode: "HTML",
     },
   );
 }

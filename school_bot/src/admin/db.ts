@@ -170,6 +170,43 @@ export function setAttended(bookingId: number, attended: boolean): void {
     .run(attended ? 1 : 0, bookingId);
 }
 
+// ── Filtered user pagination (by booking period) ─────────────────────────────
+
+export function getFilteredUserCount(since?: number, until?: number): number {
+  if (since === undefined) return getRegisteredUserCount();
+  return (
+    getDb()
+      .prepare<[number, number], { n: number }>(
+        `SELECT COUNT(DISTINCT u.id) as n FROM users u
+         JOIN bookings b ON b.user_id = u.id
+         WHERE u.name IS NOT NULL AND b.event_start >= ? AND b.event_start <= ?`,
+      )
+      .get(since, until!)?.n ?? 0
+  );
+}
+
+export function getUserAtOffsetFiltered(
+  offset: number,
+  since?: number,
+  until?: number,
+): UserWithBooking | undefined {
+  if (since === undefined) return getUserAtOffset(offset);
+  return getDb()
+    .prepare<[number, number, number], UserWithBooking>(
+      `SELECT u.id, u.telegram_id, u.telegram_name, u.name, u.phone, u.email,
+              u.created_at, u.sheets_row,
+              b.id   AS booking_id,
+              b.event_start, b.event_end,
+              b.lesson_confirmed_at, b.attended
+       FROM users u
+       JOIN bookings b ON b.user_id = u.id
+       WHERE u.name IS NOT NULL AND b.event_start >= ? AND b.event_start <= ?
+       ORDER BY u.created_at DESC
+       LIMIT 1 OFFSET ?`,
+    )
+    .get(since, until!, offset);
+}
+
 // ── Search ────────────────────────────────────────────────────────────────────
 
 export function searchUsers(query: string): UserWithBooking[] {

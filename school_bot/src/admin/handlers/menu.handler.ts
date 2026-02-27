@@ -1,26 +1,37 @@
-import { Markup, type Telegraf } from 'telegraf';
-import type { AdminBotContext } from '../types';
+import { Markup, type Telegraf } from "telegraf";
+import type { AdminBotContext } from "../types";
 import {
   getAdminByTelegramId,
   getStatsByPeriod,
   getUpcomingSchedule,
   type PeriodStats,
-} from '../db';
-import { SCENE_ADMIN_BROADCAST } from '../scenes/broadcast.scene';
-import { SCENE_ADMIN_SEARCH } from '../scenes/search.scene';
-import { SCENE_ADMIN_CLIENTS } from '../scenes/clients.scene';
-import { SCENE_ADMIN_MESSAGES } from '../scenes/messages.scene';
-import { formatDay, formatTime } from '../../utils/format';
-import { logger } from '../../logger';
+} from "../db";
+import { SCENE_ADMIN_BROADCAST } from "../scenes/broadcast.scene";
+import { SCENE_ADMIN_SEARCH } from "../scenes/search.scene";
+import { SCENE_ADMIN_CLIENTS } from "../scenes/clients.scene";
+import { SCENE_ADMIN_MESSAGES } from "../scenes/messages.scene";
+import {
+  formatDay,
+  formatTime,
+  formatMonthLabel,
+  ymToBounds,
+  currentYM,
+  prevYM,
+  nextYM,
+} from "../../utils/format";
+import { logger } from "../../logger";
 
-export const ADMIN_BTN_STATS = '📊 Статистика';
-export const ADMIN_BTN_SCHEDULE = '📅 Расписание';
-export const ADMIN_BTN_CLIENTS = '👥 Клиенты';
-export const ADMIN_BTN_SEARCH = '🔍 Найти клиента';
-export const ADMIN_BTN_BROADCAST = '📢 Рассылка';
-export const ADMIN_BTN_MESSAGES = '📝 Тексты бота';
+export const ADMIN_BTN_STATS = "📊 Статистика";
+export const ADMIN_BTN_SCHEDULE = "📅 Расписание";
+export const ADMIN_BTN_CLIENTS = "👥 Клиенты";
+export const ADMIN_BTN_SEARCH = "🔍 Найти клиента";
+export const ADMIN_BTN_BROADCAST = "📢 Рассылка";
+export const ADMIN_BTN_MESSAGES = "📝 Тексты бота";
 
-export async function sendAdminMenu(ctx: AdminBotContext, text = 'Главное меню:'): Promise<void> {
+export async function sendAdminMenu(
+  ctx: AdminBotContext,
+  text = "Главное меню:",
+): Promise<void> {
   await ctx.reply(
     text,
     Markup.keyboard([
@@ -35,36 +46,11 @@ function isAdmin(ctx: AdminBotContext): boolean {
   return !!(ctx.from && getAdminByTelegramId(ctx.from.id));
 }
 
-// ── Period helpers ────────────────────────────────────────────────────────────
-
-type PeriodKey = '7d' | 'month' | 'prev_month' | 'all';
-
-function getPeriodBounds(key: PeriodKey): { since?: number; until?: number; label: string } {
-  const now = Math.floor(Date.now() / 1000);
-  switch (key) {
-    case '7d':
-      return { since: now - 7 * 86400, label: 'за 7 дней' };
-    case 'month': {
-      const d = new Date();
-      return {
-        since: Math.floor(new Date(d.getFullYear(), d.getMonth(), 1).getTime() / 1000),
-        label: 'за этот месяц',
-      };
-    }
-    case 'prev_month': {
-      const d = new Date();
-      const until = Math.floor(new Date(d.getFullYear(), d.getMonth(), 1).getTime() / 1000) - 1;
-      const since = Math.floor(new Date(d.getFullYear(), d.getMonth() - 1, 1).getTime() / 1000);
-      return { since, until, label: 'за прошлый месяц' };
-    }
-    default:
-      return { since: undefined, label: 'за всё время' };
-  }
-}
+// ── Stats helpers ─────────────────────────────────────────────────────────────
 
 function formatStats(stats: PeriodStats, label: string): string {
   return (
-    `📊 <b>Статистика ${label}</b>\n\n` +
+    `📊 <b>Статистика — ${label}</b>\n\n` +
     `👤 Новых клиентов: <b>${stats.new_users}</b>\n` +
     `📅 Новых записей: <b>${stats.new_bookings}</b>\n` +
     `🎯 Пришли на урок: <b>${stats.attended}</b>\n` +
@@ -73,57 +59,76 @@ function formatStats(stats: PeriodStats, label: string): string {
   );
 }
 
-function statsKeyboard() {
+function statsMainKeyboard() {
   return Markup.inlineKeyboard([
     [
-      Markup.button.callback('7 дней', 'stats_7d'),
-      Markup.button.callback('Этот месяц', 'stats_month'),
+      Markup.button.callback("За всё время", "stats_all"),
+      Markup.button.callback("Выбрать месяц", `stats_m_${currentYM()}`),
     ],
+  ]);
+}
+
+function statsMonthKeyboard(ym: string) {
+  return Markup.inlineKeyboard([
     [
-      Markup.button.callback('Прошлый месяц', 'stats_prev_month'),
-      Markup.button.callback('Всё время', 'stats_all'),
+      Markup.button.callback("←", `stats_m_${prevYM(ym)}`),
+      Markup.button.callback("→", `stats_m_${nextYM(ym)}`),
     ],
+    [Markup.button.callback("← За всё время", "stats_all")],
   ]);
 }
 
 // ── Handlers ──────────────────────────────────────────────────────────────────
 
-export function registerAdminMenuHandlers(bot: Telegraf<AdminBotContext>): void {
+export function registerAdminMenuHandlers(
+  bot: Telegraf<AdminBotContext>,
+): void {
   // ── Stats ──────────────────────────────────────────────────────────────────
 
   bot.hears(ADMIN_BTN_STATS, async (ctx) => {
     if (!isAdmin(ctx)) return;
     try {
-      const { since, until, label } = getPeriodBounds('all');
-      const stats = getStatsByPeriod(since, until);
-      await ctx.reply(formatStats(stats, label), {
-        parse_mode: 'HTML',
-        ...statsKeyboard(),
+      const stats = getStatsByPeriod(undefined, undefined);
+      await ctx.reply(formatStats(stats, "за всё время"), {
+        parse_mode: "HTML",
+        ...statsMainKeyboard(),
       });
     } catch (err) {
-      logger.error('Admin stats failed', { err });
-      await ctx.reply('Ошибка при загрузке статистики.');
+      logger.error("Admin stats failed", { err });
+      await ctx.reply("Ошибка при загрузке статистики.");
     }
   });
 
-  // Period switch callbacks
-  const PERIOD_KEYS: PeriodKey[] = ['7d', 'month', 'prev_month', 'all'];
-  for (const key of PERIOD_KEYS) {
-    bot.action(`stats_${key}`, async (ctx) => {
-      if (!isAdmin(ctx)) return ctx.answerCbQuery();
-      await ctx.answerCbQuery();
-      try {
-        const { since, until, label } = getPeriodBounds(key);
-        const stats = getStatsByPeriod(since, until);
-        await ctx.editMessageText(formatStats(stats, label), {
-          parse_mode: 'HTML',
-          ...statsKeyboard(),
-        });
-      } catch (err) {
-        logger.error('Admin stats period switch failed', { err });
-      }
-    });
-  }
+  bot.action("stats_all", async (ctx) => {
+    if (!isAdmin(ctx)) return ctx.answerCbQuery();
+    await ctx.answerCbQuery();
+    try {
+      const stats = getStatsByPeriod(undefined, undefined);
+      await ctx.editMessageText(formatStats(stats, "за всё время"), {
+        parse_mode: "HTML",
+        ...statsMainKeyboard(),
+      });
+    } catch (err) {
+      logger.error("Admin stats failed", { err });
+    }
+  });
+
+  bot.action(/^stats_m_(\d{4}-\d{2})$/, async (ctx) => {
+    if (!isAdmin(ctx)) return ctx.answerCbQuery();
+    await ctx.answerCbQuery();
+    const ym = ctx.match![1]!;
+    const { since, until } = ymToBounds(ym);
+    const label = formatMonthLabel(ym);
+    try {
+      const stats = getStatsByPeriod(since, until);
+      await ctx.editMessageText(formatStats(stats, label), {
+        parse_mode: "HTML",
+        ...statsMonthKeyboard(ym),
+      });
+    } catch (err) {
+      logger.error("Admin stats month failed", { err });
+    }
+  });
 
   // ── Schedule ───────────────────────────────────────────────────────────────
 
@@ -132,25 +137,27 @@ export function registerAdminMenuHandlers(bot: Telegraf<AdminBotContext>): void 
     try {
       const rows = getUpcomingSchedule();
       if (rows.length === 0) {
-        await ctx.reply('Предстоящих записей нет.');
+        await ctx.reply("Предстоящих записей нет.");
         return;
       }
       const lines = rows.map((r, i) => {
         const start = new Date(r.event_start * 1000);
-        const confirmed = r.lesson_confirmed_at ? '✅' : '❓';
-        const tg = r.telegram_name ? `@${r.telegram_name}` : String(r.telegram_id);
+        const confirmed = r.lesson_confirmed_at ? "✅" : "❓";
+        const tg = r.telegram_name
+          ? `@${r.telegram_name}`
+          : String(r.telegram_id);
         return (
-          `${i + 1}. <b>${r.name ?? '—'}</b> ${confirmed}\n` +
+          `${i + 1}. <b>${r.name ?? "—"}</b> ${confirmed}\n` +
           `   📅 ${formatDay(start)}, ${formatTime(start)}\n` +
-          `   📞 ${r.phone ?? '—'} | 💬 ${tg}`
+          `   📞 ${r.phone ?? "—"} | 💬 ${tg}`
         );
       });
       for (const chunk of chunkText(lines, 4000)) {
-        await ctx.reply(chunk, { parse_mode: 'HTML' });
+        await ctx.reply(chunk, { parse_mode: "HTML" });
       }
     } catch (err) {
-      logger.error('Admin schedule failed', { err });
-      await ctx.reply('Ошибка при загрузке расписания.');
+      logger.error("Admin schedule failed", { err });
+      await ctx.reply("Ошибка при загрузке расписания.");
     }
   });
 
@@ -172,7 +179,38 @@ export function registerAdminMenuHandlers(bot: Telegraf<AdminBotContext>): void 
 
   bot.hears(ADMIN_BTN_BROADCAST, async (ctx) => {
     if (!isAdmin(ctx)) return;
-    return ctx.scene.enter(SCENE_ADMIN_BROADCAST);
+    await ctx.reply("📢 <b>Рассылка</b>\n\nВыберите аудиторию:", {
+      parse_mode: "HTML",
+      ...Markup.inlineKeyboard([
+        [Markup.button.callback("👥 Все клиенты", "bc_target_all")],
+        [
+          Markup.button.callback(
+            "❓ Не подтвердили урок",
+            "bc_target_unconfirmed",
+          ),
+        ],
+      ]),
+    });
+  });
+
+  bot.action("bc_target_all", async (ctx) => {
+    if (!isAdmin(ctx)) return ctx.answerCbQuery();
+    await ctx.answerCbQuery();
+    await ctx.scene.enter(SCENE_ADMIN_BROADCAST);
+    ctx.scene.state = { step: 1, target: "all" } as any;
+    await ctx.editMessageText(
+      "✏️ Введите текст сообщения (поддерживается HTML):",
+    );
+  });
+
+  bot.action("bc_target_unconfirmed", async (ctx) => {
+    if (!isAdmin(ctx)) return ctx.answerCbQuery();
+    await ctx.answerCbQuery();
+    await ctx.scene.enter(SCENE_ADMIN_BROADCAST);
+    ctx.scene.state = { step: 1, target: "unconfirmed" } as any;
+    await ctx.editMessageText(
+      "✏️ Введите текст сообщения (поддерживается HTML):",
+    );
   });
 
   // ── Messages ───────────────────────────────────────────────────────────────
@@ -187,9 +225,9 @@ export function registerAdminMenuHandlers(bot: Telegraf<AdminBotContext>): void 
 
 function chunkText(lines: string[], maxLen: number): string[] {
   const chunks: string[] = [];
-  let current = '';
+  let current = "";
   for (const line of lines) {
-    const sep = current ? '\n\n' : '';
+    const sep = current ? "\n\n" : "";
     if ((current + sep + line).length > maxLen) {
       if (current) chunks.push(current);
       current = line;

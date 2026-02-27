@@ -39,6 +39,7 @@ export const config = {
     clientSecret: required('ZOOM_CLIENT_SECRET'),
   },
   welcomeVideoNoteId: process.env['WELCOME_VIDEO_NOTE_ID'] ?? '',
+  managerContactUrl: process.env['MANAGER_CONTACT_URL'] ?? '',
   privacyPolicyUrl: required('PRIVACY_POLICY_URL'),
   timezone: process.env['TIMEZONE'] ?? 'Europe/Moscow',
   env: (process.env['NODE_ENV'] ?? 'development') as 'development' | 'production',
