@@ -1,6 +1,7 @@
 import { initDb, closeDb } from "./db/client";
 import { createBot } from "./bot";
 import { createAdminBot } from "./admin";
+import { startTildaWebhookServer } from "./webhook/tilda.server";
 import { config } from "./config";
 import { logger } from "./logger";
 
@@ -20,11 +21,17 @@ async function main(): Promise<void> {
     );
   }
 
-  // 3. Graceful shutdown
+  // 3. Start Tilda webhook server (requires admin notifier to be ready first)
+  const webhookServer = config.tildaWebhook
+    ? startTildaWebhookServer()
+    : (logger.warn('Tilda webhook server not started: TILDA_WEBHOOK is not set'), undefined);
+
+  // 4. Graceful shutdown
   const shutdown = async (signal: string) => {
     logger.info(`Received ${signal}, shutting down…`);
     bot.stop(signal);
     adminBot?.stop(signal);
+    webhookServer?.close();
     closeDb();
     process.exit(0);
   };
@@ -32,7 +39,7 @@ async function main(): Promise<void> {
   process.once("SIGINT", () => shutdown("SIGINT"));
   process.once("SIGTERM", () => shutdown("SIGTERM"));
 
-  // 4. Launch both bots concurrently without awaiting individually —
+  // 5. Launch both bots concurrently without awaiting individually —
   //    bot.launch() resolves only when the bot stops, so awaiting it serially
   //    would block the second bot from ever starting.
   const launches: Promise<void>[] = [
