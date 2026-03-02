@@ -51,7 +51,7 @@ export const config = {
   timezone: process.env['TIMEZONE'] ?? 'Europe/Moscow',
   tildaWebhook: process.env['TILDA_WEBHOOK'] ?? '',
   webhookPort: parseInt(process.env['WEBHOOK_PORT'] ?? '3001', 10),
-  publicUrl: (process.env['PUBLIC_URL'] ?? '') + '/webhook/tilda',
+  publicUrl: process.env['PUBLIC_URL'] ?? '',
   env: (process.env['NODE_ENV'] ?? 'development') as 'development' | 'production',
   isDev: (process.env['NODE_ENV'] ?? 'development') === 'development',
 } as const;
