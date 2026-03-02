@@ -13,7 +13,9 @@ import {
   MAIN_MENU_BTN,
   RESCHEDULE_BTN,
   CONTACT_MANAGER_BTN,
+  USE_AI,
 } from "../bot/keyboards";
+import { SCENE_AI } from "../scenes/ai.scene";
 import { cancelLessonReminders, scheduleNudges } from "../jobs/notifications";
 import { SCENE_BOOKING } from "../scenes/booking.scene";
 import { logger } from "../logger";
@@ -104,6 +106,12 @@ export function registerMenuHandlers(bot: Telegraf<BotContext>): void {
 
     await ctx.reply("Запись отменена. Выберите новое удобное время:");
     return ctx.scene.enter(SCENE_BOOKING);
+  });
+
+  // ── AI mode ───────────────────────────────────────────────────────────────
+
+  bot.hears(USE_AI, async (ctx) => {
+    return ctx.scene.enter(SCENE_AI);
   });
 
   // ── Contact manager ───────────────────────────────────────────────────────

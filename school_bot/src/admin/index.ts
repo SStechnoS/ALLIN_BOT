@@ -8,6 +8,7 @@ import { broadcastScene } from "./scenes/broadcast.scene";
 import { adminSearchScene } from "./scenes/search.scene";
 import { adminClientsScene } from "./scenes/clients.scene";
 import { adminMessagesScene } from "./scenes/messages.scene";
+import { adminEmailScene } from "./scenes/email.scene";
 import {
   registerAdminMenuHandlers,
   sendAdminMenu,
@@ -27,6 +28,7 @@ export function createAdminBot(): Telegraf<AdminBotContext> {
     adminSearchScene,
     adminClientsScene,
     adminMessagesScene,
+    adminEmailScene,
   ]);
   bot.use(stage.middleware());
 

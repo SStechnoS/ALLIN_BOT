@@ -234,6 +234,31 @@ export function searchUsers(query: string): UserWithBooking[] {
 
 // ── Broadcast ─────────────────────────────────────────────────────────────────
 
+export interface EmailRecipient {
+  email: string;
+  name: string | null;
+}
+
+export function getUserEmailsForBroadcast(
+  target: "all" | "unconfirmed",
+): EmailRecipient[] {
+  if (target === "all") {
+    return getDb()
+      .prepare<[], EmailRecipient>(
+        "SELECT email, name FROM users WHERE name IS NOT NULL AND email IS NOT NULL",
+      )
+      .all();
+  }
+  return getDb()
+    .prepare<[], EmailRecipient>(
+      `SELECT DISTINCT u.email, u.name FROM users u
+       JOIN bookings b ON b.user_id = u.id
+       WHERE b.event_start < unixepoch() AND b.lesson_confirmed_at IS NULL
+         AND u.email IS NOT NULL`,
+    )
+    .all();
+}
+
 export function getUsersForBroadcast(target: 'all' | 'unconfirmed'): { telegram_id: number }[] {
   if (target === 'all') {
     return getDb()

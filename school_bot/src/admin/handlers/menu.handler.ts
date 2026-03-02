@@ -10,6 +10,7 @@ import { SCENE_ADMIN_BROADCAST } from "../scenes/broadcast.scene";
 import { SCENE_ADMIN_SEARCH } from "../scenes/search.scene";
 import { SCENE_ADMIN_CLIENTS } from "../scenes/clients.scene";
 import { SCENE_ADMIN_MESSAGES } from "../scenes/messages.scene";
+import { SCENE_ADMIN_EMAIL } from "../scenes/email.scene";
 import {
   formatDay,
   formatTime,
@@ -27,6 +28,7 @@ export const ADMIN_BTN_CLIENTS = "👥 Клиенты";
 export const ADMIN_BTN_SEARCH = "🔍 Найти клиента";
 export const ADMIN_BTN_BROADCAST = "📢 Рассылка";
 export const ADMIN_BTN_MESSAGES = "📝 Тексты бота";
+export const ADMIN_BTN_EMAIL = "📧 Email рассылка";
 
 export async function sendAdminMenu(
   ctx: AdminBotContext,
@@ -38,6 +40,7 @@ export async function sendAdminMenu(
       [ADMIN_BTN_STATS, ADMIN_BTN_SCHEDULE],
       [ADMIN_BTN_CLIENTS, ADMIN_BTN_SEARCH],
       [ADMIN_BTN_BROADCAST, ADMIN_BTN_MESSAGES],
+      [ADMIN_BTN_EMAIL],
     ]).resize(),
   );
 }
@@ -218,6 +221,40 @@ export function registerAdminMenuHandlers(
   bot.hears(ADMIN_BTN_MESSAGES, async (ctx) => {
     if (!isAdmin(ctx)) return;
     return ctx.scene.enter(SCENE_ADMIN_MESSAGES);
+  });
+
+  // ── Email broadcast ────────────────────────────────────────────────────────
+
+  bot.hears(ADMIN_BTN_EMAIL, async (ctx) => {
+    if (!isAdmin(ctx)) return;
+    await ctx.reply("📧 <b>Email рассылка</b>\n\nВыберите аудиторию:", {
+      parse_mode: "HTML",
+      ...Markup.inlineKeyboard([
+        [Markup.button.callback("📨 Все с email", "email_target_all")],
+        [
+          Markup.button.callback(
+            "❓ Не подтвердили урок",
+            "email_target_unconfirmed",
+          ),
+        ],
+      ]),
+    });
+  });
+
+  bot.action("email_target_all", async (ctx) => {
+    if (!isAdmin(ctx)) return ctx.answerCbQuery();
+    await ctx.answerCbQuery();
+    await ctx.scene.enter(SCENE_ADMIN_EMAIL);
+    ctx.scene.state = { step: 1, target: "all" } as any;
+    await ctx.editMessageText("✏️ Введите тему письма:");
+  });
+
+  bot.action("email_target_unconfirmed", async (ctx) => {
+    if (!isAdmin(ctx)) return ctx.answerCbQuery();
+    await ctx.answerCbQuery();
+    await ctx.scene.enter(SCENE_ADMIN_EMAIL);
+    ctx.scene.state = { step: 1, target: "unconfirmed" } as any;
+    await ctx.editMessageText("✏️ Введите тему письма:");
   });
 }
 

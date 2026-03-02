@@ -5,6 +5,7 @@ export const MAIN_MENU_BTN = "📋 Моё бронирование";
 export const RESCHEDULE_BTN = "🔄 Перенести запись";
 export const CONTACT_MANAGER_BTN = "💬 Связаться с менеджером";
 export const USE_AI = "AI";
+export const EXIT_AI_BTN = "Выйти из AI";
 
 export async function sendMainMenu(
   ctx: BotContext,
@@ -17,4 +18,11 @@ export async function sendMainMenu(
       [RESCHEDULE_BTN, USE_AI],
     ]).resize(),
   );
+}
+
+export async function sendAiMenu(
+  ctx: BotContext,
+  text: string,
+): Promise<void> {
+  await ctx.reply(text, Markup.keyboard([[EXIT_AI_BTN]]).resize());
 }

@@ -6,6 +6,7 @@ import { buildSessionMiddleware } from './session';
 import { sendMainMenu } from './keyboards';
 import { onboardingScene, SCENE_ONBOARDING } from '../scenes/onboarding.scene';
 import { bookingScene, SCENE_BOOKING } from '../scenes/booking.scene';
+import { aiScene } from '../scenes/ai.scene';
 import { registerMenuHandlers } from '../handlers/menu.handler';
 import { getUserByTelegramId, getUserBooking, confirmLesson } from '../services/user.service';
 import { startScheduler } from '../jobs/scheduler';
@@ -17,7 +18,7 @@ export function createBot(): Telegraf<BotContext> {
   // ── Middleware stack (order matters) ──────────────────────────────────────
   bot.use(buildSessionMiddleware());
 
-  const stage = new Scenes.Stage<BotContext>([onboardingScene, bookingScene]);
+  const stage = new Scenes.Stage<BotContext>([onboardingScene, bookingScene, aiScene]);
   bot.use(stage.middleware());
 
   // Global error handler

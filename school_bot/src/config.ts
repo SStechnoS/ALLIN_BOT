@@ -38,6 +38,13 @@ export const config = {
     clientId: required('ZOOM_CLIENT_ID'),
     clientSecret: required('ZOOM_CLIENT_SECRET'),
   },
+  openai: {
+    apiKey: process.env['OPENAI_API_KEY'] ?? '',
+  },
+  resend: {
+    apiKey: process.env['RESEND_API_KEY'] ?? '',
+    from: process.env['RESEND_FROM_EMAIL'] ?? '',
+  },
   welcomeVideoNoteId: process.env['WELCOME_VIDEO_NOTE_ID'] ?? '',
   managerContactUrl: process.env['MANAGER_CONTACT_URL'] ?? '',
   privacyPolicyUrl: required('PRIVACY_POLICY_URL'),
