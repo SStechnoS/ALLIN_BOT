@@ -35,7 +35,15 @@ async function handleTildaWebhook(req, res) {
         res.end('Method Not Allowed');
         return;
     }
-    // Verify x-tilda-secret header
+    const body = await readBody(req);
+    logger_1.logger.info(`Tilda webhook raw body: ${body}`);
+    // Tilda connectivity test — respond immediately, no secret needed
+    if (body.trim() === 'test=test') {
+        res.writeHead(200, { 'Content-Type': 'text/plain' });
+        res.end('OK');
+        return;
+    }
+    // Verify x-tilda-secret header for real form submissions
     const secret = req.headers['x-tilda-secret'] ?? '';
     if (config_1.config.tildaWebhook && secret !== config_1.config.tildaWebhook) {
         logger_1.logger.warn(`Tilda webhook: invalid secret header "${secret}"`);
@@ -43,8 +51,6 @@ async function handleTildaWebhook(req, res) {
         res.end('Unauthorized');
         return;
     }
-    const body = await readBody(req);
-    logger_1.logger.info(`Tilda webhook raw body: ${body}`);
     const params = new url_1.URLSearchParams(body);
     const data = {};
     params.forEach((value, key) => { data[key] = value; });
