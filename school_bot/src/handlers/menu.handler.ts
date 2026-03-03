@@ -29,7 +29,7 @@ export function registerMenuHandlers(bot: Telegraf<BotContext>): void {
 
     const user = getUserByTelegramId(ctx.from.id);
     if (!user) {
-      await ctx.reply("Вы не зарегистрированы. Нажмите /start для начала.");
+      await ctx.reply("❗ Вы ещё не зарегистрированы. Нажмите /start чтобы начать.");
       return;
     }
 
@@ -41,17 +41,18 @@ export function registerMenuHandlers(bot: Telegraf<BotContext>): void {
     const start = new Date(booking.event_start * 1000);
     const end = new Date(booking.event_end * 1000);
     const zoomLine = booking.zoom_link
-      ? `\n<b>Ссылка Zoom:</b> ${booking.zoom_link}`
-      : "";
+      ? `\n🔗 <b>Ссылка Zoom:</b> ${booking.zoom_link}`
+      : " ";
 
     await ctx.reply(
-      `<b>Ваша запись на пробный урок:</b>\n\n` +
-        `<b>Имя:</b> ${user.name ?? ""}\n` +
-        (user.phone ? `<b>Телефон:</b> ${user.phone}\n` : "") +
-        (user.email ? `<b>Email:</b> ${user.email}\n` : "") +
-        `\n<b>День:</b> ${formatDay(start)}\n` +
-        `<b>Время:</b> ${formatTime(start)} — ${formatTime(end)}` +
-        zoomLine,
+      `📋 <b>Ваша запись на пробный урок:</b>\n\n` +
+        `👤 <b>Имя:</b> ${user.name ?? ""}\n` +
+        (user.phone ? `📱 <b>Телефон:</b> ${user.phone}\n` : "") +
+        (user.email ? `📧 <b>Email:</b> ${user.email}\n` : "") +
+        `\n📅 <b>День:</b> ${formatDay(start)}\n` +
+        `🕐 <b>Время:</b> ${formatTime(start)} — ${formatTime(end)}` +
+        zoomLine +
+        `\n\n✨ Ждём вас! Если нужно перенести — нажмите «🔄 Перенести запись»`,
       { parse_mode: "HTML" },
     );
   });
@@ -63,7 +64,7 @@ export function registerMenuHandlers(bot: Telegraf<BotContext>): void {
 
     const user = getUserByTelegramId(ctx.from.id);
     if (!user) {
-      await ctx.reply("Вы не зарегистрированы. Нажмите /start для начала.");
+      await ctx.reply("❗ Вы ещё не зарегистрированы. Нажмите /start чтобы начать.");
       return;
     }
 
@@ -104,7 +105,7 @@ export function registerMenuHandlers(bot: Telegraf<BotContext>): void {
       }
     }
 
-    await ctx.reply("Запись отменена. Выберите новое удобное время:");
+    await ctx.reply("🔄 Запись отменена. Выберите новое удобное время 📅");
     return ctx.scene.enter(SCENE_BOOKING);
   });
 
@@ -127,9 +128,9 @@ export function registerMenuHandlers(bot: Telegraf<BotContext>): void {
     }
 
     await ctx.reply(
-      "Напишите менеджеру напрямую:",
+      "👋 Наш менеджер готов ответить на любые вопросы!\n\nНапишите прямо сейчас — обычно отвечаем в течение нескольких минут 🕐",
       Markup.inlineKeyboard([
-        [Markup.button.url("Открыть чат с менеджером", url)],
+        [Markup.button.url("💬 Написать менеджеру", url)],
       ]),
     );
   });

@@ -4,8 +4,8 @@ import type { BotContext } from "../types";
 export const MAIN_MENU_BTN = "📋 Моё бронирование";
 export const RESCHEDULE_BTN = "🔄 Перенести запись";
 export const CONTACT_MANAGER_BTN = "💬 Связаться с менеджером";
-export const USE_AI = "AI";
-export const EXIT_AI_BTN = "Выйти из AI";
+export const USE_AI = "🤖 Спросить AI";
+export const EXIT_AI_BTN = "← Выйти из AI";
 
 export async function sendMainMenu(
   ctx: BotContext,
