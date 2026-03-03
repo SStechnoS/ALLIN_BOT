@@ -52,45 +52,49 @@ async function handleTildaWebhook(req, res) {
     const email = data['Email'] || data['email'] || '';
     const phone = data['Phone'] || data['phone'] || '';
     logger_1.logger.info('Tilda webhook parsed', { name, email, phone, allFields: data });
-    // ── Email to the lead ────────────────────────────────────────────────────
-    if (email) {
-        try {
-            await (0, resend_service_1.sendEmail)({
-                to: email,
-                subject: 'Ваша заявка принята!',
-                html: `
-          <p>Здравствуйте${name ? `, <b>${name}</b>` : ''}!</p>
-          <p>Спасибо за заявку. Мы получили ваши данные и свяжемся с вами в ближайшее время.</p>
-          <p>С уважением,<br/>Команда All In Academy</p>
-        `,
-            });
-            logger_1.logger.info('Welcome email sent', { email });
-        }
-        catch (err) {
-            logger_1.logger.error('Failed to send welcome email', { err, email });
-        }
-    }
-    // ── Admin notification ───────────────────────────────────────────────────
-    const extra = Object.entries(data)
-        .filter(([k]) => !KNOWN_FIELDS.has(k))
-        .map(([k, v]) => `  ${k}: ${v}`)
-        .join('\n');
-    const adminText = [
-        '🆕 <b>Новая заявка с сайта</b>',
-        name && `👤 Имя: <b>${name}</b>`,
-        email && `📧 Email: <b>${email}</b>`,
-        phone && `📞 Телефон: <b>${phone}</b>`,
-        extra && `\n📋 Доп. данные:\n${extra}`,
-    ].filter(Boolean).join('\n');
-    try {
-        await (0, notifications_1.notifyAdmins)(adminText);
-    }
-    catch (err) {
-        logger_1.logger.error('Failed to notify admins about Tilda lead', { err });
-    }
-    logger_1.logger.info('Tilda webhook processed successfully');
+    // Respond immediately so Tilda doesn't time out
     res.writeHead(200, { 'Content-Type': 'text/plain' });
     res.end('OK');
+    // Process email + admin notifications in the background
+    setImmediate(async () => {
+        // ── Email to the lead ──────────────────────────────────────────────────
+        if (email) {
+            try {
+                await (0, resend_service_1.sendEmail)({
+                    to: email,
+                    subject: 'Ваша заявка принята!',
+                    html: `
+            <p>Здравствуйте${name ? `, <b>${name}</b>` : ''}!</p>
+            <p>Спасибо за заявку. Мы получили ваши данные и свяжемся с вами в ближайшее время.</p>
+            <p>С уважением,<br/>Команда All In Academy</p>
+          `,
+                });
+                logger_1.logger.info('Welcome email sent', { email });
+            }
+            catch (err) {
+                logger_1.logger.error('Failed to send welcome email', { err, email });
+            }
+        }
+        // ── Admin notification ─────────────────────────────────────────────────
+        const extra = Object.entries(data)
+            .filter(([k]) => !KNOWN_FIELDS.has(k))
+            .map(([k, v]) => `  ${k}: ${v}`)
+            .join('\n');
+        const adminText = [
+            '🆕 <b>Новая заявка с сайта</b>',
+            name && `👤 Имя: <b>${name}</b>`,
+            email && `📧 Email: <b>${email}</b>`,
+            phone && `📞 Телефон: <b>${phone}</b>`,
+            extra && `\n📋 Доп. данные:\n${extra}`,
+        ].filter(Boolean).join('\n');
+        try {
+            await (0, notifications_1.notifyAdmins)(adminText);
+        }
+        catch (err) {
+            logger_1.logger.error('Failed to notify admins about Tilda lead', { err });
+        }
+        logger_1.logger.info('Tilda webhook processed successfully');
+    });
 }
 function startTildaWebhookServer() {
     const server = http_1.default.createServer(async (req, res) => {

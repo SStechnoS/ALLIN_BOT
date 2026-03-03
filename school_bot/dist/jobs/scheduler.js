@@ -5,6 +5,7 @@ const telegraf_1 = require("telegraf");
 const db_1 = require("./db");
 const user_service_1 = require("../services/user.service");
 const notifications_1 = require("../admin/notifications");
+const resend_service_1 = require("../services/resend.service");
 const config_1 = require("../config");
 const logger_1 = require("../logger");
 // ── Night guard ───────────────────────────────────────────────────────────────
@@ -79,6 +80,18 @@ async function handleJob(bot, job) {
                 ],
             ]),
         });
+        if (user.email) {
+            const zoomHtml = lp.zoomLink ? `<p>🔗 <b>Ссылка Zoom:</b> <a href="${lp.zoomLink}">${lp.zoomLink}</a></p>` : "";
+            (0, resend_service_1.sendEmail)({
+                to: user.email,
+                subject: "Напоминание: завтра ваш пробный урок 🔔",
+                html: `<p>Здравствуйте${user.name ? `, <b>${user.name}</b>` : ""}!</p>
+<p>Напоминаем, что <b>завтра</b> у вас пробный урок в <b>All In Academy</b>.</p>
+<p>📅 <b>День:</b> ${lp.dayLabel}<br/>🕐 <b>Время:</b> ${lp.timeLabel}</p>
+${zoomHtml}
+<p>Ждём вас! 🎓</p>`,
+            }).catch((err) => logger_1.logger.error("Email remind_24h failed", { err, email: user.email }));
+        }
         return;
     }
     if (job.type === "remind_5h") {
@@ -88,6 +101,18 @@ async function handleJob(bot, job) {
             `<b>День:</b> ${lp.dayLabel}\n` +
             `<b>Время:</b> ${lp.timeLabel}` +
             zoomLine, { parse_mode: "HTML" });
+        if (user.email) {
+            const zoomHtml = lp.zoomLink ? `<p>🔗 <b>Ссылка Zoom:</b> <a href="${lp.zoomLink}">${lp.zoomLink}</a></p>` : "";
+            (0, resend_service_1.sendEmail)({
+                to: user.email,
+                subject: "Через 5 часов — ваш пробный урок ⏰",
+                html: `<p>Здравствуйте${user.name ? `, <b>${user.name}</b>` : ""}!</p>
+<p>Совсем скоро — <b>через 5 часов</b> — начнётся ваш пробный урок.</p>
+<p>📅 <b>День:</b> ${lp.dayLabel}<br/>🕐 <b>Время:</b> ${lp.timeLabel}</p>
+${zoomHtml}
+<p>Увидимся совсем скоро! 🎓</p>`,
+            }).catch((err) => logger_1.logger.error("Email remind_5h failed", { err, email: user.email }));
+        }
         return;
     }
     if (job.type === "remind_30min") {
@@ -96,6 +121,18 @@ async function handleJob(bot, job) {
             `<b>Время:</b> ${lp.timeLabel}` +
             zoomLine +
             `\n\nДо встречи! 👋`, { parse_mode: "HTML" });
+        if (user.email) {
+            const zoomHtml = lp.zoomLink ? `<p>🔗 <b>Ссылка Zoom:</b> <a href="${lp.zoomLink}">${lp.zoomLink}</a></p>` : "";
+            (0, resend_service_1.sendEmail)({
+                to: user.email,
+                subject: "Урок через 30 минут! 🚀",
+                html: `<p>Здравствуйте${user.name ? `, <b>${user.name}</b>` : ""}!</p>
+<p>Ваш пробный урок начнётся <b>через 30 минут</b>!</p>
+<p>📅 <b>День:</b> ${lp.dayLabel}<br/>🕐 <b>Время:</b> ${lp.timeLabel}</p>
+${zoomHtml}
+<p>До встречи! 👋</p>`,
+            }).catch((err) => logger_1.logger.error("Email remind_30min failed", { err, email: user.email }));
+        }
         return;
     }
     // ── Admin alert: client didn't confirm 4h before lesson ───────────────────

@@ -3,6 +3,7 @@ import type { BotContext } from "../types";
 import { getDueJobs, markJobSent, type JobRow } from "./db";
 import { getUserByTelegramId, getUserBooking } from "../services/user.service";
 import { notifyAdmins } from "../admin/notifications";
+import { sendEmail } from "../services/resend.service";
 import { config } from "../config";
 import { logger } from "../logger";
 
@@ -109,6 +110,18 @@ async function handleJob(
         ]),
       },
     );
+    if (user.email) {
+      const zoomHtml = lp.zoomLink ? `<p>🔗 <b>Ссылка Zoom:</b> <a href="${lp.zoomLink}">${lp.zoomLink}</a></p>` : "";
+      sendEmail({
+        to: user.email,
+        subject: "Напоминание: завтра ваш пробный урок 🔔",
+        html: `<p>Здравствуйте${user.name ? `, <b>${user.name}</b>` : ""}!</p>
+<p>Напоминаем, что <b>завтра</b> у вас пробный урок в <b>All In Academy</b>.</p>
+<p>📅 <b>День:</b> ${lp.dayLabel}<br/>🕐 <b>Время:</b> ${lp.timeLabel}</p>
+${zoomHtml}
+<p>Ждём вас! 🎓</p>`,
+      }).catch((err) => logger.error("Email remind_24h failed", { err, email: user.email }));
+    }
     return;
   }
 
@@ -122,6 +135,18 @@ async function handleJob(
         zoomLine,
       { parse_mode: "HTML" },
     );
+    if (user.email) {
+      const zoomHtml = lp.zoomLink ? `<p>🔗 <b>Ссылка Zoom:</b> <a href="${lp.zoomLink}">${lp.zoomLink}</a></p>` : "";
+      sendEmail({
+        to: user.email,
+        subject: "Через 5 часов — ваш пробный урок ⏰",
+        html: `<p>Здравствуйте${user.name ? `, <b>${user.name}</b>` : ""}!</p>
+<p>Совсем скоро — <b>через 5 часов</b> — начнётся ваш пробный урок.</p>
+<p>📅 <b>День:</b> ${lp.dayLabel}<br/>🕐 <b>Время:</b> ${lp.timeLabel}</p>
+${zoomHtml}
+<p>Увидимся совсем скоро! 🎓</p>`,
+      }).catch((err) => logger.error("Email remind_5h failed", { err, email: user.email }));
+    }
     return;
   }
 
@@ -135,6 +160,18 @@ async function handleJob(
         `\n\nДо встречи! 👋`,
       { parse_mode: "HTML" },
     );
+    if (user.email) {
+      const zoomHtml = lp.zoomLink ? `<p>🔗 <b>Ссылка Zoom:</b> <a href="${lp.zoomLink}">${lp.zoomLink}</a></p>` : "";
+      sendEmail({
+        to: user.email,
+        subject: "Урок через 30 минут! 🚀",
+        html: `<p>Здравствуйте${user.name ? `, <b>${user.name}</b>` : ""}!</p>
+<p>Ваш пробный урок начнётся <b>через 30 минут</b>!</p>
+<p>📅 <b>День:</b> ${lp.dayLabel}<br/>🕐 <b>Время:</b> ${lp.timeLabel}</p>
+${zoomHtml}
+<p>До встречи! 👋</p>`,
+      }).catch((err) => logger.error("Email remind_30min failed", { err, email: user.email }));
+    }
     return;
   }
 
