@@ -42,7 +42,7 @@ async function handleTildaWebhook(req: http.IncomingMessage, res: http.ServerRes
 
   // Tilda connectivity test — respond immediately, no secret needed
   if (body.trim() === 'test=test') {
-    res.writeHead(200, { 'Content-Type': 'text/plain' });
+    res.writeHead(200, { 'Content-Type': 'text/plain', 'Content-Length': '2', 'Connection': 'close' });
     res.end('OK');
     return;
   }
@@ -68,7 +68,7 @@ async function handleTildaWebhook(req: http.IncomingMessage, res: http.ServerRes
   logger.info('Tilda webhook parsed', { name, email, phone, allFields: data });
 
   // Respond immediately so Tilda doesn't time out
-  res.writeHead(200, { 'Content-Type': 'text/plain' });
+  res.writeHead(200, { 'Content-Type': 'text/plain', 'Content-Length': '2', 'Connection': 'close' });
   res.end('OK');
 
   // Process email + admin notifications in the background

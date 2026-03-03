@@ -39,7 +39,7 @@ async function handleTildaWebhook(req, res) {
     logger_1.logger.info(`Tilda webhook raw body: ${body}`);
     // Tilda connectivity test — respond immediately, no secret needed
     if (body.trim() === 'test=test') {
-        res.writeHead(200, { 'Content-Type': 'text/plain' });
+        res.writeHead(200, { 'Content-Type': 'text/plain', 'Content-Length': '2', 'Connection': 'close' });
         res.end('OK');
         return;
     }
@@ -59,7 +59,7 @@ async function handleTildaWebhook(req, res) {
     const phone = data['Phone'] || data['phone'] || '';
     logger_1.logger.info('Tilda webhook parsed', { name, email, phone, allFields: data });
     // Respond immediately so Tilda doesn't time out
-    res.writeHead(200, { 'Content-Type': 'text/plain' });
+    res.writeHead(200, { 'Content-Type': 'text/plain', 'Content-Length': '2', 'Connection': 'close' });
     res.end('OK');
     // Process email + admin notifications in the background
     setImmediate(async () => {
