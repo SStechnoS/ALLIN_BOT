@@ -43,17 +43,17 @@ async function handleTildaWebhook(req, res) {
         res.end('OK');
         return;
     }
-    // Verify x-tilda-secret header for real form submissions
-    const secret = req.headers['x-tilda-secret'] ?? '';
+    const params = new url_1.URLSearchParams(body);
+    const data = {};
+    params.forEach((value, key) => { data[key] = value; });
+    // Verify secret POST field for real form submissions
+    const secret = data['secret'] ?? '';
     if (config_1.config.tildaWebhook && secret !== config_1.config.tildaWebhook) {
-        logger_1.logger.warn(`Tilda webhook: invalid secret header "${secret}"`);
+        logger_1.logger.warn(`Tilda webhook: invalid secret field "${secret}"`);
         res.writeHead(401, { 'Content-Type': 'text/plain' });
         res.end('Unauthorized');
         return;
     }
-    const params = new url_1.URLSearchParams(body);
-    const data = {};
-    params.forEach((value, key) => { data[key] = value; });
     const name = data['Name'] || data['name'] || '';
     const email = data['Email'] || data['email'] || '';
     const phone = data['Phone'] || data['phone'] || '';
