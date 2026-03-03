@@ -18,7 +18,7 @@ function registerMenuHandlers(bot) {
             return;
         const user = (0, user_service_1.getUserByTelegramId)(ctx.from.id);
         if (!user) {
-            await ctx.reply("Вы не зарегистрированы. Нажмите /start для начала.");
+            await ctx.reply("❗ Вы ещё не зарегистрированы. Нажмите /start чтобы начать.");
             return;
         }
         const booking = (0, user_service_1.getUserBooking)(user.id);
@@ -28,15 +28,16 @@ function registerMenuHandlers(bot) {
         const start = new Date(booking.event_start * 1000);
         const end = new Date(booking.event_end * 1000);
         const zoomLine = booking.zoom_link
-            ? `\n<b>Ссылка Zoom:</b> ${booking.zoom_link}`
-            : "";
-        await ctx.reply(`<b>Ваша запись на пробный урок:</b>\n\n` +
-            `<b>Имя:</b> ${user.name ?? ""}\n` +
-            (user.phone ? `<b>Телефон:</b> ${user.phone}\n` : "") +
-            (user.email ? `<b>Email:</b> ${user.email}\n` : "") +
-            `\n<b>День:</b> ${(0, format_1.formatDay)(start)}\n` +
-            `<b>Время:</b> ${(0, format_1.formatTime)(start)} — ${(0, format_1.formatTime)(end)}` +
-            zoomLine, { parse_mode: "HTML" });
+            ? `\n🔗 <b>Ссылка Zoom:</b> ${booking.zoom_link}`
+            : " ";
+        await ctx.reply(`📋 <b>Ваша запись на пробный урок:</b>\n\n` +
+            `👤 <b>Имя:</b> ${user.name ?? ""}\n` +
+            (user.phone ? `📱 <b>Телефон:</b> ${user.phone}\n` : "") +
+            (user.email ? `📧 <b>Email:</b> ${user.email}\n` : "") +
+            `\n📅 <b>День:</b> ${(0, format_1.formatDay)(start)}\n` +
+            `🕐 <b>Время:</b> ${(0, format_1.formatTime)(start)} — ${(0, format_1.formatTime)(end)}` +
+            zoomLine +
+            `\n\n✨ Ждём вас! Если нужно перенести — нажмите «🔄 Перенести запись»`, { parse_mode: "HTML" });
     });
     // ── Reschedule ────────────────────────────────────────────────────────────
     bot.hears(keyboards_1.RESCHEDULE_BTN, async (ctx) => {
@@ -44,7 +45,7 @@ function registerMenuHandlers(bot) {
             return;
         const user = (0, user_service_1.getUserByTelegramId)(ctx.from.id);
         if (!user) {
-            await ctx.reply("Вы не зарегистрированы. Нажмите /start для начала.");
+            await ctx.reply("❗ Вы ещё не зарегистрированы. Нажмите /start чтобы начать.");
             return;
         }
         const booking = (0, user_service_1.getUserBooking)(user.id);
@@ -81,7 +82,7 @@ function registerMenuHandlers(bot) {
                 logger_1.logger.error("Sheet sync failed (reschedule)", { err });
             }
         }
-        await ctx.reply("Запись отменена. Выберите новое удобное время:");
+        await ctx.reply("🔄 Запись отменена. Выберите новое удобное время 📅");
         return ctx.scene.enter(booking_scene_1.SCENE_BOOKING);
     });
     // ── AI mode ───────────────────────────────────────────────────────────────
@@ -95,8 +96,8 @@ function registerMenuHandlers(bot) {
             await ctx.reply("Контакт менеджера сейчас недоступен. Попробуйте позже или воспользуйтесь /start.");
             return;
         }
-        await ctx.reply("Напишите менеджеру напрямую:", telegraf_1.Markup.inlineKeyboard([
-            [telegraf_1.Markup.button.url("Открыть чат с менеджером", url)],
+        await ctx.reply("👋 Наш менеджер готов ответить на любые вопросы!\n\nНапишите прямо сейчас — обычно отвечаем в течение нескольких минут 🕐", telegraf_1.Markup.inlineKeyboard([
+            [telegraf_1.Markup.button.url("💬 Написать менеджеру", url)],
         ]));
     });
 }

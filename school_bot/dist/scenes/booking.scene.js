@@ -76,10 +76,10 @@ exports.bookingScene.action(/^booking_day_(.+)$/, async (ctx) => {
         dayLabel: daySlots[0].dayLabel,
         slots: slotMap,
     };
-    await ctx.editMessageText(`Выберите удобное время:\n<b>${daySlots[0].dayLabel}</b>`, {
+    await ctx.editMessageText(`🕐 Выберите удобное время:\n<b>${daySlots[0].dayLabel}</b>`, {
         ...telegraf_1.Markup.inlineKeyboard([
             ...timeButtons,
-            [telegraf_1.Markup.button.callback("← Назад", "booking_back_days")],
+            [telegraf_1.Markup.button.callback("← Назад к дням", "booking_back_days")],
         ]),
         parse_mode: "HTML",
     });
@@ -119,13 +119,13 @@ exports.bookingScene.action(/^booking_time_(\d+)$/, async (ctx) => {
         eventStart: slot.eventStart,
         eventEnd: slot.eventEnd,
     };
-    await ctx.editMessageText(`Ваша запись на пробный урок:\n\n` +
-        `<b>День:</b> ${state.dayLabel}\n` +
-        `<b>Время:</b> ${slot.timeLabel}\n\n` +
-        `Подтвердите запись:`, {
+    await ctx.editMessageText(`📋 <b>Проверьте запись на пробный урок:</b>\n\n` +
+        `📅 <b>День:</b> ${state.dayLabel}\n` +
+        `🕐 <b>Время:</b> ${slot.timeLabel}\n\n` +
+        `Всё верно? Нажмите «Подтвердить» 👇`, {
         ...telegraf_1.Markup.inlineKeyboard([
-            [telegraf_1.Markup.button.callback("✅ Подтвердить", "booking_confirm")],
-            [telegraf_1.Markup.button.callback("← Назад", "booking_back_times")],
+            [telegraf_1.Markup.button.callback("✅ Подтвердить запись", "booking_confirm")],
+            [telegraf_1.Markup.button.callback("← Назад к времени", "booking_back_times")],
         ]),
         parse_mode: "HTML",
     });
@@ -138,12 +138,12 @@ exports.bookingScene.action("booking_confirm", async (ctx) => {
     const state = s(ctx);
     const { eventId, dayLabel = "", timeLabel = "", eventStart, eventEnd, } = state;
     if (!eventId || !eventStart || !eventEnd) {
-        await ctx.reply("Произошла ошибка. Начните выбор заново.");
+        await ctx.reply("⚠️ Что-то пошло не так. Начните выбор заново.");
         return ctx.scene.reenter();
     }
     const user = (0, user_service_1.getUserByTelegramId)(ctx.from.id);
     if (!user) {
-        await ctx.reply("Пользователь не найден. Нажмите /start");
+        await ctx.reply("⚠️ Пользователь не найден. Нажмите /start");
         return ctx.scene.leave();
     }
     // Create Zoom meeting for the selected slot
@@ -177,7 +177,7 @@ exports.bookingScene.action("booking_confirm", async (ctx) => {
     }
     catch (err) {
         logger_1.logger.error("Booking failed", { err, eventId });
-        await ctx.answerCbQuery("Не удалось забронировать. Попробуйте ещё раз.");
+        await ctx.answerCbQuery("⚠️ Не удалось забронировать. Попробуйте ещё раз.");
         return;
     }
     // Cancel nudge jobs, schedule lesson reminders
@@ -217,16 +217,16 @@ exports.bookingScene.action("booking_confirm", async (ctx) => {
         }
     }
     clearState(ctx);
-    const zoomLine = zoomLink ? `\n<b>Ссылка Zoom:</b> ${zoomLink}` : "";
-    await ctx.editMessageText(`✅ Запись подтверждена!\n\n` +
-        `<b>Имя:</b> ${user.name ?? ctx.from.first_name}\n` +
-        (user.phone ? `<b>Телефон:</b> ${user.phone}\n` : "") +
-        (user.email ? `<b>Email:</b> ${user.email}\n` : "") +
-        `\n<b>День:</b> ${dayLabel}\n` +
-        `<b>Время:</b> ${timeLabel}` +
+    const zoomLine = zoomLink ? `\n🔗 <b>Ссылка Zoom:</b> ${zoomLink}` : "";
+    await ctx.editMessageText(`🎉 <b>Запись подтверждена!</b>\n\n` +
+        `👤 <b>Имя:</b> ${user.name ?? ctx.from.first_name}\n` +
+        (user.phone ? `📱 <b>Телефон:</b> ${user.phone}\n` : "") +
+        (user.email ? `📧 <b>Email:</b> ${user.email}\n` : "") +
+        `\n📅 <b>День:</b> ${dayLabel}\n` +
+        `🕐 <b>Время:</b> ${timeLabel}` +
         zoomLine +
-        `\n\nДо встречи!`, { parse_mode: "HTML" });
-    await (0, keyboards_1.sendMainMenu)(ctx, "Вы можете просмотреть свою запись:");
+        `\n\n✨ Ждём вас на уроке!`, { parse_mode: "HTML" });
+    await (0, keyboards_1.sendMainMenu)(ctx, "📋 Ваша запись сохранена. Чем могу помочь?");
     return ctx.scene.leave();
 });
 // ── Back buttons ───────────────────────────────────────────────────────────
@@ -296,8 +296,7 @@ exports.bookingScene.command("start", async (ctx) => {
 });
 // ── Ignore unexpected text input ───────────────────────────────────────────
 exports.bookingScene.on("message", async (ctx) => {
-    await ctx.reply("Сейчас мы выбираем время для урока. Пожалуйста, используйте кнопки под сообщением.\n\n" +
-        "Чтобы начать заново из любого места, просто отправьте команду /start.");
+    await ctx.reply("☝️ Для выбора времени используйте кнопки в сообщении выше.\n\nЧтобы начать заново — отправьте /start");
 });
 // ── Helpers ────────────────────────────────────────────────────────────────
 const MONTHS_PER_PAGE = 6;
@@ -314,7 +313,7 @@ async function showMonthSelection(ctx, page) {
         return;
     }
     if (slots.size === 0) {
-        const msg = "К сожалению, свободных слотов нет. Попробуйте позже.";
+        const msg = "😔 К сожалению, свободных слотов пока нет.\n\nСвяжитесь с менеджером — он поможет подобрать время 👇";
         ctx.callbackQuery ? await ctx.editMessageText(msg) : await ctx.reply(msg);
         await ctx.scene.leave();
         return;
@@ -349,7 +348,7 @@ async function showMonthSelection(ctx, page) {
         rows.push(navRow);
     }
     ctx.scene.state = { ...s(ctx), monthPage: safePage };
-    const text = "Выберите месяц для пробного урока:";
+    const text = "📅 Выберите удобный месяц для пробного урока:";
     ctx.callbackQuery
         ? await ctx.editMessageText(text, telegraf_1.Markup.inlineKeyboard(rows))
         : await ctx.reply(text, telegraf_1.Markup.inlineKeyboard(rows));
@@ -376,7 +375,7 @@ async function showDaySelectionForMonth(ctx, monthKey) {
     ]);
     buttons.push([telegraf_1.Markup.button.callback("← Назад", "booking_back_months")]);
     ctx.scene.state = { ...s(ctx), monthKey };
-    const text = `Выберите день:\n<b>${(0, format_1.formatMonthLabel)(monthKey)}</b>`;
+    const text = `📆 Выберите день:\n<b>${(0, format_1.formatMonthLabel)(monthKey)}</b>`;
     ctx.callbackQuery
         ? await ctx.editMessageText(text, {
             ...telegraf_1.Markup.inlineKeyboard(buttons),
@@ -405,10 +404,10 @@ async function showTimeSelection(ctx, dayKey, slots) {
         slots: slotMap,
         dayLabel: daySlots[0].dayLabel,
     };
-    await ctx.editMessageText(`Выберите удобное время:\n<b>${daySlots[0].dayLabel}</b>`, {
+    await ctx.editMessageText(`🕐 Выберите удобное время:\n<b>${daySlots[0].dayLabel}</b>`, {
         ...telegraf_1.Markup.inlineKeyboard([
             ...timeButtons,
-            [telegraf_1.Markup.button.callback("← Назад", "booking_back_days")],
+            [telegraf_1.Markup.button.callback("← Назад к дням", "booking_back_days")],
         ]),
         parse_mode: "HTML",
     });

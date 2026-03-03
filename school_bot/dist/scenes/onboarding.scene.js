@@ -84,9 +84,9 @@ exports.onboardingScene.enter(async (ctx) => {
         }
     }
     // 3) Отдельным сообщением — запрос на подтверждение политики
-    await ctx.reply("Чтобы продолжить, подтвердите, пожалуйста, политику конфиденциальности:", telegraf_1.Markup.inlineKeyboard([
+    await ctx.reply("🔐 Для продолжения необходимо принять политику конфиденциальности.\n\nМы храним ваши данные безопасно и не передаём третьим лицам.", telegraf_1.Markup.inlineKeyboard([
         [
-            telegraf_1.Markup.button.callback("✅ Подтвердить", "onboarding_consent"),
+            telegraf_1.Markup.button.callback("✅ Принимаю", "onboarding_consent"),
             telegraf_1.Markup.button.url("📄 Политика конфиденциальности", config_1.config.privacyPolicyUrl),
         ],
     ]));
@@ -97,7 +97,7 @@ exports.onboardingScene.action("onboarding_consent", async (ctx) => {
         return ctx.answerCbQuery();
     await ctx.answerCbQuery();
     ctx.scene.state = { ...s(ctx), step: 1 };
-    await ctx.reply("Поделитесь своим номером телефона:", telegraf_1.Markup.keyboard([
+    await ctx.reply("🎉 Отлично, вы нас приняли!\n\n📱 Теперь поделитесь своим номером телефона — нажмите кнопку ниже:", telegraf_1.Markup.keyboard([
         [telegraf_1.Markup.button.contactRequest("📱 Отправить номер телефона")],
     ])
         .resize()
@@ -118,9 +118,9 @@ exports.onboardingScene.command("start", async (ctx) => {
     if (state.step === 0) {
         // Ещё не подтвердили согласие — повторно отправляем welcome и отдельное сообщение с политикой
         await ctx.reply(welcomeText);
-        await ctx.reply("Чтобы продолжить, подтвердите, пожалуйста, политику конфиденциальности:", telegraf_1.Markup.inlineKeyboard([
+        await ctx.reply("🔐 Для продолжения необходимо принять политику конфиденциальности.\n\nМы храним ваши данные безопасно и не передаём третьим лицам.", telegraf_1.Markup.inlineKeyboard([
             [
-                telegraf_1.Markup.button.callback("✅ Подтвердить", "onboarding_consent"),
+                telegraf_1.Markup.button.callback("✅ Принимаю", "onboarding_consent"),
                 telegraf_1.Markup.button.url("📄 Политика конфиденциальности", config_1.config.privacyPolicyUrl),
             ],
         ]));
@@ -129,17 +129,17 @@ exports.onboardingScene.command("start", async (ctx) => {
         // Уже после согласия — просто повторно отправляем welcome и подсказываем текущий шаг
         await ctx.reply(welcomeText);
         if (state.step === 1) {
-            await ctx.reply("Поделитесь своим номером телефона:", telegraf_1.Markup.keyboard([
+            await ctx.reply("📱 Поделитесь своим номером телефона — нажмите кнопку ниже:", telegraf_1.Markup.keyboard([
                 [telegraf_1.Markup.button.contactRequest("📱 Отправить номер телефона")],
             ])
                 .resize()
                 .oneTime());
         }
         else if (state.step === 2) {
-            await ctx.reply("Введите вашу электронную почту:", telegraf_1.Markup.removeKeyboard());
+            await ctx.reply("📧 Введите вашу электронную почту:", telegraf_1.Markup.removeKeyboard());
         }
         else if (state.step === 3) {
-            await ctx.reply("Введите ваше имя:");
+            await ctx.reply("✍️ Введите ваше имя:");
         }
     }
 });
@@ -148,13 +148,13 @@ exports.onboardingScene.on("message", async (ctx) => {
     const state = s(ctx);
     // Step 0: waiting for consent — remind user
     if (state.step === 0) {
-        await ctx.reply("Нажмите «✅ Подтвердить» для продолжения.");
+        await ctx.reply("👆 Нажмите кнопку «✅ Принимаю» выше, чтобы продолжить.");
         return;
     }
     // Step 1: waiting for phone contact
     if (state.step === 1) {
         if (!("contact" in ctx.message)) {
-            await ctx.reply("Пожалуйста, воспользуйтесь кнопкой для отправки номера.");
+            await ctx.reply("📱 Используйте кнопку ниже, чтобы поделиться номером телефона.");
             return;
         }
         const phone = ctx.message.contact.phone_number;
@@ -167,7 +167,7 @@ exports.onboardingScene.on("message", async (ctx) => {
                 logger_1.logger.error("Sheet sync failed (phone)", { err });
             }
         }
-        await ctx.reply("Введите вашу электронную почту:", telegraf_1.Markup.removeKeyboard());
+        await ctx.reply("📧 Отлично! Теперь введите вашу электронную почту:", telegraf_1.Markup.removeKeyboard());
         return;
     }
     // Step 2: waiting for email
@@ -176,7 +176,7 @@ exports.onboardingScene.on("message", async (ctx) => {
             return;
         const email = ctx.message.text.trim();
         if (!EMAIL_RE.test(email)) {
-            await ctx.reply("Неверный формат. Введите корректный email:");
+            await ctx.reply("❌ Неверный формат email. Попробуйте ещё раз:\n\nПример: <code>name@example.com</code>", { parse_mode: "HTML" });
             return;
         }
         ctx.scene.state = { ...state, step: 3, email };
@@ -188,7 +188,7 @@ exports.onboardingScene.on("message", async (ctx) => {
                 logger_1.logger.error("Sheet sync failed (email)", { err });
             }
         }
-        await ctx.reply("Введите ваше имя:");
+        await ctx.reply("✍️ Почти готово! Введите ваше имя:");
         return;
     }
     // Step 3: waiting for name → finalize user → sync sheet → enter booking
@@ -197,11 +197,11 @@ exports.onboardingScene.on("message", async (ctx) => {
             return;
         const name = ctx.message.text.trim();
         if (!name) {
-            await ctx.reply("Пожалуйста, введите ваше имя:");
+            await ctx.reply("✍️ Пожалуйста, введите ваше имя:");
             return;
         }
         if (!state.userId) {
-            await ctx.reply("Произошла ошибка. Попробуйте ещё раз.");
+            await ctx.reply("⚠️ Что-то пошло не так. Попробуйте ещё раз.");
             return ctx.scene.reenter();
         }
         try {
@@ -213,7 +213,7 @@ exports.onboardingScene.on("message", async (ctx) => {
         }
         catch (err) {
             logger_1.logger.error("Failed to finalize user during onboarding", { err });
-            await ctx.reply("Произошла ошибка. Попробуйте ещё раз.");
+            await ctx.reply("⚠️ Произошла ошибка. Попробуйте ещё раз.");
             return;
         }
         if (state.sheetsRow) {
@@ -230,7 +230,7 @@ exports.onboardingScene.on("message", async (ctx) => {
                 logger_1.logger.error("Sheet sync failed (name/gdpr)", { err });
             }
         }
-        await ctx.reply("Отлично! Теперь выберем время для вашего пробного урока.");
+        await ctx.reply(`🎯 Отлично, ${name}! Все данные сохранены.\n\nТеперь выберем удобное время для вашего <b>пробного пробного урока</b> 📅`, { parse_mode: "HTML" });
         return ctx.scene.enter("booking");
     }
 });

@@ -7,8 +7,8 @@ const telegraf_1 = require("telegraf");
 exports.MAIN_MENU_BTN = "📋 Моё бронирование";
 exports.RESCHEDULE_BTN = "🔄 Перенести запись";
 exports.CONTACT_MANAGER_BTN = "💬 Связаться с менеджером";
-exports.USE_AI = "AI";
-exports.EXIT_AI_BTN = "Выйти из AI";
+exports.USE_AI = "🤖 Спросить AI";
+exports.EXIT_AI_BTN = "← Выйти из AI";
 async function sendMainMenu(ctx, text) {
     await ctx.reply(text, telegraf_1.Markup.keyboard([
         [exports.MAIN_MENU_BTN, exports.CONTACT_MANAGER_BTN],

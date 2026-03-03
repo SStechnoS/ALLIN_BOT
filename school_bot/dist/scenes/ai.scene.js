@@ -21,7 +21,7 @@ exports.aiScene = new telegraf_1.Scenes.BaseScene(exports.SCENE_AI);
 // ── Enter ──────────────────────────────────────────────────────────────────
 exports.aiScene.enter(async (ctx) => {
     ctx.scene.state = { history: [] };
-    await (0, keyboards_1.sendAiMenu)(ctx, "AI режим включён. Задайте свой вопрос — я постараюсь помочь!\n\nЧтобы выйти, нажмите кнопку ниже.");
+    await (0, keyboards_1.sendAiMenu)(ctx, "🤖 <b>AI-ассистент активирован!</b>\n\nЯ знаю всё об All In Academy и готов ответить на ваши вопросы 💬\n\nСпрашивайте — я помогу! Чтобы выйти, нажмите кнопку ниже.");
 });
 // ── /start — exit AI mode and follow normal routing ────────────────────────
 exports.aiScene.command("start", async (ctx) => {
@@ -34,17 +34,17 @@ exports.aiScene.command("start", async (ctx) => {
     const booking = (0, user_service_1.getUserBooking)(user.id);
     if (!booking)
         return ctx.scene.enter(booking_scene_1.SCENE_BOOKING);
-    await (0, keyboards_1.sendMainMenu)(ctx, `С возвращением, ${user.name ?? ctx.from.first_name}!`);
+    await (0, keyboards_1.sendMainMenu)(ctx, `👋 С возвращением, ${user.name ?? ctx.from.first_name}!`);
 });
 // ── Exit button ────────────────────────────────────────────────────────────
 exports.aiScene.hears(keyboards_1.EXIT_AI_BTN, async (ctx) => {
     await ctx.scene.leave();
-    await (0, keyboards_1.sendMainMenu)(ctx, "Вы вышли из AI режима.");
+    await (0, keyboards_1.sendMainMenu)(ctx, "✅ Вы вышли из AI режима. Чем могу помочь?");
 });
 // ── Text messages — chat with AI ───────────────────────────────────────────
 exports.aiScene.on("text", async (ctx) => {
     if (!config_1.config.openai.apiKey) {
-        await ctx.reply("AI режим временно недоступен. Обратитесь к менеджеру.");
+        await ctx.reply("⚠️ AI режим временно недоступен. Свяжитесь с менеджером 💬");
         return;
     }
     const userText = ctx.message.text;
@@ -58,7 +58,7 @@ exports.aiScene.on("text", async (ctx) => {
     catch (err) {
         logger_1.logger.error("OpenAI request failed", { err });
         state.history.pop(); // remove the failed user message to keep history consistent
-        await ctx.reply("Произошла ошибка при обращении к AI. Попробуйте ещё раз.");
+        await ctx.reply("⚠️ Не удалось получить ответ. Попробуйте ещё раз или задайте другой вопрос.");
         return;
     }
     state.history.push({ role: "assistant", content: reply });
@@ -66,6 +66,6 @@ exports.aiScene.on("text", async (ctx) => {
 });
 // ── Non-text messages ──────────────────────────────────────────────────────
 exports.aiScene.on("message", async (ctx) => {
-    await ctx.reply("Я понимаю только текстовые сообщения. Напишите свой вопрос.");
+    await ctx.reply("🖊️ Я понимаю только текстовые сообщения. Напишите ваш вопрос!");
 });
 //# sourceMappingURL=ai.scene.js.map
